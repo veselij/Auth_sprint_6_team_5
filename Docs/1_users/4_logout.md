@@ -13,8 +13,8 @@ sequenceDiagram
 	S->>C: OK(200)
 ```
 
-**Path**: /users/logout/{user_id}
-**Type**: Post
-**Header**: Authorization: Bearer {token}
-**Body**: None
-**Response Body**: None
+**Path**: /users/logout/{user_id}  
+**Type**: Post  
+**Header**: Authorization: Bearer {token}  
+**Body**: None  
+**Response Body**: None  
