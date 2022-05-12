@@ -9,7 +9,7 @@ sequenceDiagram
 	S->>S: check uuid from jwt with uuid in query or super_user if not match & check jwt signature
 	S-->>C: 401 Unauthorized
 	S->>R: delete {user_id: refresh token}
-	S->>R: put {user_id: access token} in canceled tokens table
+	S->>R: if not superuser put {user_id: access token} in canceled tokens table
 	S->>C: OK(200)
 ```
 

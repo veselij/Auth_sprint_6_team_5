@@ -16,12 +16,14 @@ sequenceDiagram
 **Path**: /users/register  
 **Type**: Post  
 **Body**:  
+```
 {
-	first_name: "",
-	last_name: "",
-	login: "",
-	password: ""
+	"first_name": "",
+	"last_name": "",
+	"login": "",
+	"password": ""
 }  
+```
 
 **for storing data in BD we will use ciphering**
 1. generate random key1

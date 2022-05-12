@@ -9,10 +9,12 @@ sequenceDiagram
 	S->>S: check uuid from jwt with uuid in query or super user if not & check jwt signature
 	S-->>C: 401 Unauthorized
 	S->>S: change user data
-	S->>S: update key3 if password was changed
+	opt if password was changed
+	S->>S: update key3
 	S->>S: generate new tokens (access & refresh)
 	S->>R: delete exising refresh token for user_id
-	S->>R: store {user_id: refresh token}
+	S->>R: store {user_id: refresh token} 
+	end
 	S->>C: OK(200) (access & refresh tokens)
 	
 ```
@@ -20,18 +22,22 @@ sequenceDiagram
 **Path**: /users/{user_id}  
 **Type**: PUT  
 **Header**: Authorization: Bearer {token}  
-**Body**:   
+**Body**:
+```
 {
-	first_name: "",
-	last_name: "",
-	login: "",
-	password: ""
+	"first_name": "",
+	"last_name": "",
+	"login": "",
+	"password": ""
 }  
+```
 **Response Body**:  
+```
 {
-access_id: access_token,
-refresh_id: refresh_token
+	"access_id": "access_token,
+	"refresh_id": "refresh_token"
 }  
+```
 
 Token time to live 1 day
 Token refresh time to live 10 days
