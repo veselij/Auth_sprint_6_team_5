@@ -11,7 +11,7 @@ time to live = время жизни refresh_token. данные попадаю�
 
 ##### Postgress - основная БД
 
-1.  Таблица user (id, login, password, is_superuser, first_name, last_name)
+1.  Таблица user (id, login, password, is_superuser)
 2.  Таблица role (id, role_name, role_description)
 3.  Таблица user_role (id, user_id, role_id)
 4.  Таблица access_history (id, user_id, user_agent, login_date, login_status)
