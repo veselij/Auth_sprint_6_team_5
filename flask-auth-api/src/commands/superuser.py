@@ -1,20 +1,18 @@
-import click
 from getpass import getpass
 from typing import Optional
 
+import click
 from flask.cli import AppGroup
 
+from core.config import config
 from db.db import db_session
 from models.db_models import User
-from core.config import config
 from utils.password_hashing import get_password_hash
 
-
-superuser_cli = AppGroup("superuser")
+superuser_cli = AppGroup('superuser')
 
 
 class InvalidUserDataError(Exception):
-
     def __init__(self, message) -> None:
         self.message = message
         super().__init__(self.message)
@@ -28,12 +26,12 @@ def read_password(prompt: str) -> str:
 
 
 def get_password():
-    password: str = read_password(prompt="Password:")
-    password2: str = read_password(prompt="Please confirm password:")
+    password: str = read_password(prompt='Password:')
+    password2: str = read_password(prompt='Please confirm password:')
     while password != password2:
-        print("Passwords did not match")
-        password = read_password(prompt="Password:")
-        password2 = read_password(prompt="Please confirm password:")
+        print('Passwords did not match')
+        password = read_password(prompt='Password:')
+        password2 = read_password(prompt='Please confirm password:')
     return password
 
 
@@ -48,10 +46,10 @@ def create_superuser_int():
     name: str
     password: str
 
-    name = read_name("Please specify superuser name: ")
+    name = read_name('Please specify superuser name: ')
     while User.query.filter_by(login=name).first():
-        print("Username {0} already exists".format(name))
-        name = read_name("Please specify superuser name: ")
+        print('Username {0} already exists'.format(name))
+        name = read_name('Please specify superuser name: ')
 
     password = get_password()
 
@@ -74,12 +72,12 @@ def create_superuser():
     db_session.commit()
 
 
-@superuser_cli.command("create")
+@superuser_cli.command('create')
 @click.option(
-    "--interactive/--no-interactive",
+    '--interactive/--no-interactive',
     show_default=True,
     default=True,
-    help="If True interactive prompt will be used, if False Username and password will be loaded from env variables",
+    help='If True interactive prompt will be used, if False Username and password will be loaded from env variables',
 )
 def create_superuser_command(interactive):
     if interactive:
@@ -88,12 +86,12 @@ def create_superuser_command(interactive):
         create_superuser()
 
 
-@superuser_cli.command("reset-password")
-@click.argument("login")
+@superuser_cli.command('reset-password')
+@click.argument('login')
 def reset_password(login):
     user = User.query.filter_by(login=login).first()
     if not user:
-        raise InvalidUserDataError("User {0} does not exists".format(login))
+        raise InvalidUserDataError('User {0} does not exists'.format(login))
     password: str = get_password()
     user.password = get_password_hash(password)
     db_session.commit()

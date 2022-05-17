@@ -3,6 +3,7 @@ from functools import wraps
 
 from flask import jsonify, request
 from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
+
 from models.db_models import User
 
 
@@ -19,5 +20,7 @@ def jwt_verification(superuser_only=False):
                 return fn(*args, **kwargs)
             else:
                 return jsonify(msg="Access Denied"), 403
+
         return decorator
+
     return wrapper
