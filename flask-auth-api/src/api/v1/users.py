@@ -1,10 +1,12 @@
+from os import wait
+from typing import Optional
 from flasgger import SwaggerView
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import get_jwt
 
 from api.v1.users_schemas import AuthSchema, MsgSchema, TokenSchema
 from db.cache import get_cache_refresh, get_cache_access
-from services.users import autorize_user, create_user, generate_tokens, check_refresh_token, check_revoked_token
+from services.users import autorize_user, create_user, generate_tokens, check_refresh_token, check_revoked_token, revoke_access_token
 from services.decorators import jwt_verification
 
 bp = Blueprint('users', __name__, url_prefix='/users')
@@ -101,14 +103,45 @@ class RefreshView(SwaggerView):
 
     def post(self, user_id):
         token = get_jwt()
-        user_id = check_refresh_token(token, get_cache_refresh())
 
-        if not user_id or not check_revoked_token(user_id, get_cache_access(), token):
+        if not check_refresh_token(token, get_cache_refresh(), user_id) or not check_revoked_token(user_id, get_cache_access(), token):
             return jsonify({'msg': 'Wrong login or password'}), 401
 
         return jsonify(**generate_tokens(user_id, get_cache_refresh()))
 
 
+class LogoutView(SwaggerView):
+    decorators = [jwt_verification()]
+
+    tags = ['users']
+
+    parameters = [{"in": "path", "name": "user_id",  "schema": {"type": "string", "format": "uuid"}, "required": True},
+            {"in": "query", "name": "all_devices", "schema": {"type": "boolean", "default": False}}, 
+            ]
+    consumes = []
+    produces = []
+    responses = {
+        200: {
+            'description': 'Logout successfully',
+        },
+        401: {
+            'description': 'Unauthorized',
+            'content': {'application/json': {'schema': MsgSchema, 'example': {'msg': 'Missing Authorization Header'}}},
+        },
+    }
+
+    def post(self, user_id: str):
+        all_devices = request.args.get('all_devices')
+        if all_devices == 'true':
+            all_devices = True
+        else:
+            all_devices = False
+        token = get_jwt()
+        revoke_access_token(token, get_cache_access(), user_id, all_devices)
+        return '', 200
+
+
 bp.add_url_rule('/register', view_func=RegistrationView.as_view('register'), methods=['POST'])
 bp.add_url_rule('/login', view_func=LoginView.as_view('login'), methods=['POST'])
 bp.add_url_rule('/refresh/<uuid:user_id>', view_func=RefreshView.as_view('refresh'), methods=['POST'])
+bp.add_url_rule('/logout/<uuid:user_id>', view_func=LogoutView.as_view('logout'), methods=['POST'])

@@ -1,5 +1,6 @@
 import json
-from typing import Optional, Type
+from typing import Optional
+from time import time
 
 from flask import request
 from flask_jwt_extended import create_access_token, create_refresh_token, get_jti
@@ -52,14 +53,14 @@ def generate_tokens(user_id: str, cache: CacheManager) -> dict[str, str]:
     return {'access_token': access_token, 'refresh_token': refresh_token}
 
 
-def check_refresh_token(jwt: dict, cache: CacheManager) -> Optional[str]:
+def check_refresh_token(jwt: dict, cache: CacheManager, user_id: str) -> bool:
     key = jwt.get('jti')
-    user_id = cache.get_value(key)
+    user_id_cache = cache.get_value(key)
     if not user_id:
-        return 
-    if user_id != jwt.get('sub'):
-        return
-    return user_id
+        return False
+    if user_id != user_id_cache:
+        return False
+    return True
 
 
 def check_revoked_token(user_id: str, cache: CacheManager, token: dict) -> bool:
@@ -76,3 +77,17 @@ def check_revoked_token(user_id: str, cache: CacheManager, token: dict) -> bool:
         return True
     return exp <= float(token_revoke_time)
 
+
+def revoke_access_token(token: dict, cache: CacheManager, user_id: str, all: bool = False) -> None:
+    if all:
+        jti = 'all'
+    else:
+        jti = token['jti']
+    value = str(time())
+    current_value = cache.get_value(str(user_id))
+    if current_value:
+        data = json.loads(current_value)
+        data[jti] = value
+    else:
+        data = {jti: value}
+    cache.set_value(str(user_id), json.dumps(data), ex=config.refresh_ttl)
