@@ -1,29 +1,33 @@
+import json
 from typing import Optional, Type
 
-from flask_jwt_extended import create_access_token, create_refresh_token
-from sqlalchemy.exc import IntegrityError, OperationalError
+from flask import request
+from flask_jwt_extended import create_access_token, create_refresh_token, get_jti
+from sqlalchemy.exc import OperationalError
 
 from core.config import config, logger
-from db.cache import Cache
-from db.db import db_session
-from models.db_models import User
+from db.cache import CacheManager
+from db.db import db_session, commit_session
+from models.db_models import User, UserAccessHistory
 from utils.decorators import backoff
 from utils.exceptions import RetryExceptionError
 from utils.password_hashing import get_password_hash
 
 
-@backoff(logger, start_sleep_time=0.1, factor=2, border_sleep_time=10)
 def create_user(username: str, password: str) -> Optional[User]:
     user = User(login=username, password=get_password_hash(password))
     db_session.add(user)
-    try:
-        db_session.commit()
-    except IntegrityError:
+    commited = commit_session()
+    if not commited:
         return
-    except OperationalError:
-        db_session.rollback()
-        raise RetryExceptionError('Database not available')
     return user
+
+
+def log_login_attempt(user_id: str, status: bool) -> None:
+    user_agent = request.headers.get('User-Agent')
+    login_attempt = UserAccessHistory(user_id=user_id, user_agent=user_agent, login_status=status)
+    db_session.add(login_attempt)
+    commit_session()
 
 
 @backoff(logger, start_sleep_time=0.1, factor=2, border_sleep_time=10)
@@ -32,17 +36,43 @@ def autorize_user(login: str, password: str) -> Optional[User]:
         user = User.query.filter_by(login=login).one_or_none()
     except OperationalError:
         raise RetryExceptionError('Database not available')
-    if not user or not user.check_password(password):
+    if not user:
         return
+    if not user.check_password(password):
+        log_login_attempt(user.id, False)
+        return
+    log_login_attempt(user.id, True)
     return user
 
 
-@backoff(logger, start_sleep_time=0.1, factor=2, border_sleep_time=10)
-def generate_tokens(user: User, cache: Cache, exc: Type[Exception]) -> dict[str, str]:
-    access_token = create_access_token(identity=user.id)
-    refresh_token = create_refresh_token(identity=user.id, additional_claims={'access_token': access_token})
-    try:
-        cache.set(name=str(refresh_token), value=str(user.id), ex=config.refresh_ttl)
-    except exc:
-        raise RetryExceptionError('Cache is not available')
+def generate_tokens(user_id: str, cache: CacheManager) -> dict[str, str]:
+    access_token = create_access_token(identity=user_id)
+    refresh_token = create_refresh_token(identity=user_id, additional_claims={'access_token': get_jti(access_token)})
+    cache.set_value(name=str(get_jti(refresh_token)), value=user_id, ex=config.refresh_ttl)
     return {'access_token': access_token, 'refresh_token': refresh_token}
+
+
+def check_refresh_token(jwt: dict, cache: CacheManager) -> Optional[str]:
+    key = jwt.get('jti')
+    user_id = cache.get_value(key)
+    if not user_id:
+        return 
+    if user_id != jwt.get('sub'):
+        return
+    return user_id
+
+
+def check_revoked_token(user_id: str, cache: CacheManager, token: dict) -> bool:
+    access_token = token['access_token']
+    exp = token['exp']
+    revoked_tokens = cache.get_value(user_id)
+    if not revoked_tokens:
+        return True
+    revoked_tokens = json.loads(revoked_tokens)
+    if 'all' in revoked_tokens:
+        return exp <= float(revoked_tokens['all'])
+    token_revoke_time = revoked_tokens.get(access_token, None)
+    if token_revoke_time is None:
+        return True
+    return exp <= float(token_revoke_time)
+

@@ -2,6 +2,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy.exc import IntegrityError, OperationalError
 
 from core.config import config, logger
 from utils.decorators import backoff
@@ -31,3 +32,15 @@ def init_db():
         Base.metadata.create_all(bind=engine)
     except OperationalError:
         raise RetryExceptionError('Database not available')
+
+
+@backoff(logger, start_sleep_time=0.1, factor=2, border_sleep_time=10)
+def commit_session() -> bool:
+    try:
+        db_session.commit()
+    except IntegrityError:
+        return False
+    except OperationalError:
+        db_session.rollback()
+        raise RetryExceptionError('Database not available')
+    return True

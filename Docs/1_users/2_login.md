@@ -10,7 +10,7 @@ sequenceDiagram
 	Note right of S: check hash(passwd) with passwd in DB (using dynamic salt)
 	S-->>C: 401 Unauthorized
 	S->>S: generate tokens (access & refresh)
-	S->>R: store {user_id: refresh token}
+	S->>R: store in db0 {refesh_token_id: user_id}
 	S->>C: OK(200) (access & refresh tokens)
 ```
 
