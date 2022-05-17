@@ -5,26 +5,25 @@ sequenceDiagram
 	participant R as Redis
 	Note over C, S: registration
 	C->>S: https://x.x.x.x/users/register
+	S->>S: Check if login and password provided
+	S-->>C: Bad request (400)
 	S->>S: Check if user exist
 	S-->>C: Conflict (409)
 	S->>S: Create user
-	Note right of S: create key for cipheing data in DB based on passwd
-	Note right of S: cipher user data in DB
 	S->>C: Created(201)
 ```
 
-**Path**: /users/register  
+**Path**: /users/register
 **Type**: Post  
 **Body**:  
 ```
 {
-	"first_name": "",
-	"last_name": "",
 	"login": "",
 	"password": ""
 }  
 ```
 
+## Can be implemted in future
 **for storing data in BD we will use ciphering**
 1. generate random key1
 2. generate key2 from user password with PBKDF2

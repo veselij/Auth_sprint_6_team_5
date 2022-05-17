@@ -5,7 +5,7 @@ sequenceDiagram
     participant R as Redis
 
 	Note over C, S: Delete role from user
-	C->>S: https://x.x.x.x/users/{user_id}/roles
+	C->>S: https://x.x.x.x/roles/user/{user_id}
 	S->>S: check uuid from jwt same as in query if not is super user and token valid
 	S-->>C: 401 Unauthorized
 	S->>S: get role_ids from token
@@ -13,7 +13,7 @@ sequenceDiagram
 
 ```
 
-**Path**: /users/{user_uuid}/roles
+**Path**: /roles/user/{user_id}
 
 **Type**: GET
 **Header**: Authorization: Bearer {token}  
