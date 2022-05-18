@@ -20,6 +20,8 @@ sequenceDiagram
 **Response Body**:  
 ```
 {
+	"id": "",
+	"user_id": "",
 	"user_agent": "",
 	"login_date": "",
 	"login_status": ""

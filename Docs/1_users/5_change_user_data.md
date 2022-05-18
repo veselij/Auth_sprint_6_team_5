@@ -8,14 +8,10 @@ sequenceDiagram
 	C->>S: https://x.x.x.x/users/{user_id}
 	S->>S: check uuid from jwt with uuid in query or super user if not & check jwt signature
 	S-->>C: 401 Unauthorized
+	S->>S: check if new login not exist
+	S-->>C: Conflict (409)
 	S->>S: change user data
-	opt if password was changed
-	S->>S: update key3
-	S->>S: generate new tokens (access & refresh)
-	S->>R: delete exising refresh token for user_id
-	S->>R: store {user_id: refresh token} 
-	end
-	S->>C: OK(200) (access & refresh tokens)
+	S->>C: OK(200)
 	
 ```
 
@@ -25,8 +21,6 @@ sequenceDiagram
 **Body**:
 ```
 {
-	"first_name": "",
-	"last_name": "",
 	"login": "",
 	"password": ""
 }  
@@ -38,6 +32,3 @@ sequenceDiagram
 	"refresh_id": "refresh_token"
 }  
 ```
-
-Token time to live 1 day
-Token refresh time to live 10 days
