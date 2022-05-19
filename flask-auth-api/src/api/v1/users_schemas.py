@@ -23,8 +23,8 @@ class MsgSchema(Schema):
 
 
 class TokenSchema(Schema):
-    access_token = fields.UUID(required=True)
-    refresh_token = fields.UUID(required=True)
+    access_token = fields.Str(required=True)
+    refresh_token = fields.Str(required=True)
 
 
 class AllDevicesSchema(Schema):

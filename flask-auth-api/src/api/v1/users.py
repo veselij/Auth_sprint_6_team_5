@@ -1,13 +1,13 @@
 from http import HTTPStatus
-from typing import Type
 from uuid import UUID
 
-from flasgger import SwaggerView
-from flask import Blueprint, abort, jsonify, make_response, request
+from flask import Blueprint, jsonify, make_response
+from flask.wrappers import Response
 from flask_jwt_extended import get_jwt
-from marshmallow import ValidationError
-from marshmallow.schema import Schema
 
+from api.v1.common_view import CustomSwaggerView
+from api.v1.decorators import jwt_verification, revoked_token_check
+from api.v1.msg import Msg
 from api.v1.users_schemas import (
     AllDevicesSchema,
     AuthSchema,
@@ -18,47 +18,18 @@ from api.v1.users_schemas import (
     UserHistorySchema,
     UserUUIDSchema,
 )
-from db.cache import get_cache_access, get_cache_refresh
-from models.db_models import get_user_by_id
-from services.decorators import jwt_verification, revoked_token_check
 from services.users import (
     autorize_user,
     check_refresh_token,
     create_user,
     generate_tokens,
+    get_user,
     get_user_history,
     revoke_access_token,
     update_user_data,
 )
 
 bp = Blueprint("users", __name__, url_prefix="/users")
-
-
-class CustomSwaggerView(SwaggerView):
-
-    consumes = []
-    produces = []
-
-    def validate_body(self, schema: Type[Schema]):
-        try:
-            body = schema().load(request.json)
-        except ValidationError as err:
-            abort(make_response(jsonify(err.messages), HTTPStatus.BAD_REQUEST.value))
-        self.validated_body = body
-
-    def validate_path(self, schema: Type[Schema]):
-        try:
-            path = schema().load(request.view_args)
-        except ValidationError as err:
-            abort(make_response(jsonify(err.messages), HTTPStatus.BAD_REQUEST.value))
-        self.validated_path = path
-
-    def validate_query(self, schema: Type[Schema]):
-        try:
-            query = schema().load(request.args.to_dict())
-        except ValidationError as err:
-            abort(make_response(jsonify(err.messages), HTTPStatus.BAD_REQUEST.value))
-        self.validated_query = query
 
 
 class RegistrationView(CustomSwaggerView):
@@ -70,23 +41,24 @@ class RegistrationView(CustomSwaggerView):
         },
     }
     responses = {
-        HTTPStatus.CREATED.value: {"description": HTTPStatus.CREATED.phrase},
-        HTTPStatus.BAD_REQUEST.value: {
-            "description": HTTPStatus.BAD_REQUEST.phrase,
-            "content": {"application/json": {"schema": MsgSchema}},
+        HTTPStatus.CREATED.value: {
+            "description": HTTPStatus.CREATED.phrase,
+            "content": {
+                "application/json": {"schema": MsgSchema, "example": Msg.created.value},
+            },
         },
         HTTPStatus.CONFLICT.value: {
             "description": HTTPStatus.CONFLICT.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": {"msg": "User already exists"}}},
+            "content": {"application/json": {"schema": MsgSchema, "example": Msg.user_alredy_exists.value}},
         },
     }
 
-    def post(self):
+    def post(self) -> Response:
         self.validate_body(AuthSchema)
-        user = create_user(self.validated_body["login"], self.validated_body["password"])
-        if not user:
-            return jsonify({"msg": "User already exists"}), HTTPStatus.CONFLICT.value
-        return "", HTTPStatus.CREATED.value
+        created = create_user(self.validated_body["login"], self.validated_body["password"])
+        if not created:
+            return make_response(jsonify(MsgSchema().load(Msg.user_alredy_exists.value)), HTTPStatus.CONFLICT.value)
+        return make_response(jsonify(MsgSchema().load(Msg.created.value)), HTTPStatus.CREATED.value)
 
 
 class LoginView(CustomSwaggerView):
@@ -101,25 +73,21 @@ class LoginView(CustomSwaggerView):
         HTTPStatus.OK.value: {
             "description": HTTPStatus.OK.phrase,
             "content": {
-                "application/json": {"schema": TokenSchema, "example": {"access_token": "111", "refresh_token": "222"}},
+                "application/json": {"schema": TokenSchema},
             },
-        },
-        HTTPStatus.BAD_REQUEST.value: {
-            "description": HTTPStatus.BAD_REQUEST.phrase,
-            "content": {"application/json": {"schema": MsgSchema}},
         },
         HTTPStatus.UNAUTHORIZED.value: {
             "description": HTTPStatus.UNAUTHORIZED.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": {"msg": "Wrong login or password"}}},
+            "content": {"application/json": {"schema": MsgSchema, "example": Msg.unauthorized.value}},
         },
     }
 
-    def post(self):
+    def post(self) -> Response:
         self.validate_body(AuthSchema)
-        user = autorize_user(self.validated_body["login"], self.validated_body["password"])
-        if not user:
-            return jsonify({"msg": "Wrong login or password"}), HTTPStatus.UNAUTHORIZED.value
-        return jsonify(**generate_tokens(str(user.id), get_cache_refresh())), HTTPStatus.OK.value
+        user_id = autorize_user(self.validated_body["login"], self.validated_body["password"])
+        if not user_id:
+            return make_response(jsonify(MsgSchema().load(Msg.unauthorized.value)), HTTPStatus.UNAUTHORIZED.value)
+        return make_response(jsonify(TokenSchema().load(generate_tokens(user_id))), HTTPStatus.OK.value)
 
 
 class RefreshView(CustomSwaggerView):
@@ -132,27 +100,22 @@ class RefreshView(CustomSwaggerView):
         HTTPStatus.OK.value: {
             "description": HTTPStatus.OK.phrase,
             "content": {
-                "application/json": {"schema": TokenSchema, "example": {"access_token": "111", "refresh_token": "222"}},
+                "application/json": {"schema": TokenSchema},
             },
-        },
-        HTTPStatus.BAD_REQUEST.value: {
-            "description": HTTPStatus.BAD_REQUEST.phrase,
-            "content": {"application/json": {"schema": MsgSchema}},
         },
         HTTPStatus.UNAUTHORIZED.value: {
             "description": HTTPStatus.UNAUTHORIZED.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": {"msg": "Missing Authorization Header"}}},
+            "content": {"application/json": {"schema": MsgSchema, "example": Msg.unauthorized.value}},
         },
     }
 
-    def post(self, user_id: UUID):
+    def post(self, user_id: UUID) -> Response:
         user = str(user_id)
         self.validate_path(UserUUIDSchema)
         token = get_jwt()
-        if not check_refresh_token(token, get_cache_refresh(), user):
-            return jsonify({"msg": "Wrong login or password"}), HTTPStatus.UNAUTHORIZED.value
-
-        return jsonify(**generate_tokens(user, get_cache_refresh())), HTTPStatus.OK.value
+        if not check_refresh_token(token, user):
+            return make_response(jsonify(MsgSchema().load(Msg.unauthorized.value)), HTTPStatus.UNAUTHORIZED.value)
+        return make_response(jsonify(TokenSchema().load(generate_tokens(user))), HTTPStatus.OK.value)
 
 
 class LogoutView(CustomSwaggerView):
@@ -167,23 +130,20 @@ class LogoutView(CustomSwaggerView):
     responses = {
         HTTPStatus.OK.value: {
             "description": HTTPStatus.OK.phrase,
-        },
-        HTTPStatus.BAD_REQUEST.value: {
-            "description": HTTPStatus.BAD_REQUEST.phrase,
-            "content": {"application/json": {"schema": MsgSchema}},
+            "content": {"application/json": {"schema": MsgSchema, "example": Msg.ok.value}},
         },
         HTTPStatus.UNAUTHORIZED.value: {
             "description": HTTPStatus.UNAUTHORIZED.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": {"msg": "Missing Authorization Header"}}},
+            "content": {"application/json": {"schema": MsgSchema, "example": Msg.unauthorized.value}},
         },
     }
 
-    def post(self, user_id: str):
+    def post(self, user_id: str) -> Response:
         self.validate_path(UserUUIDSchema)
         self.validate_query(AllDevicesSchema)
         token = get_jwt()
-        revoke_access_token(token, get_cache_access(), user_id, self.validated_query["all_devices"])
-        return "", HTTPStatus.OK.value
+        revoke_access_token(token, user_id, self.validated_query["all_devices"])
+        return make_response(jsonify(MsgSchema().load(Msg.ok.value)), HTTPStatus.OK.value)
 
 
 class ChangeUserView(CustomSwaggerView):
@@ -199,35 +159,33 @@ class ChangeUserView(CustomSwaggerView):
     responses = {
         HTTPStatus.OK.value: {
             "description": HTTPStatus.OK.phrase,
-        },
-        HTTPStatus.BAD_REQUEST.value: {
-            "description": HTTPStatus.BAD_REQUEST.phrase,
+            "content": {"application/json": {"schema": MsgSchema, "example": Msg.ok.value}},
         },
         HTTPStatus.UNAUTHORIZED.value: {
             "description": HTTPStatus.UNAUTHORIZED.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": {"msg": "Missing Authorization Header"}}},
+            "content": {"application/json": {"schema": MsgSchema, "example": Msg.unauthorized.value}},
         },
         HTTPStatus.NOT_FOUND.value: {
             "description": HTTPStatus.NOT_FOUND.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": {"msg": "User does not exist"}}},
+            "content": {"application/json": {"schema": MsgSchema, "example": Msg.not_found.value}},
         },
         HTTPStatus.CONFLICT.value: {
             "description": HTTPStatus.CONFLICT.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": {"msg": "Login already exists"}}},
+            "content": {"application/json": {"schema": MsgSchema, "example": Msg.login_already_exists.value}},
         },
     }
 
-    def put(self, user_id: str):
+    def put(self, user_id: str) -> Response:
         self.validate_body(AuthSchema)
         self.validate_path(UserUUIDSchema)
 
-        user = get_user_by_id(user_id)
+        user = get_user(user_id)
         if not user:
-            return jsonify({"msg": "User does not exist"}), HTTPStatus.NOT_FOUND.value
+            return make_response(jsonify(MsgSchema().load(Msg.not_found.value)), HTTPStatus.NOT_FOUND.value)
 
         if not update_user_data(user, self.validated_body["login"], self.validated_body["password"]):
-            return jsonify({"msg": "Login already exists"}), HTTPStatus.CONFLICT.value
-        return "", HTTPStatus.OK.value
+            return make_response(jsonify(MsgSchema().load(Msg.login_already_exists.value)), HTTPStatus.CONFLICT.value)
+        return make_response(jsonify(MsgSchema().load(Msg.ok.value)), HTTPStatus.OK.value)
 
 
 class UserHistoryView(CustomSwaggerView):
@@ -265,33 +223,29 @@ class UserHistoryView(CustomSwaggerView):
                 "application/json": {"schema": {"type": "array", "items": UserHistorySchema}},
             },
         },
-        HTTPStatus.BAD_REQUEST.value: {
-            "description": HTTPStatus.BAD_REQUEST.phrase,
-        },
         HTTPStatus.UNAUTHORIZED.value: {
             "description": HTTPStatus.UNAUTHORIZED.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": {"msg": "Missing Authorization Header"}}},
+            "content": {"application/json": {"schema": MsgSchema, "example": Msg.unauthorized.value}},
         },
         HTTPStatus.NOT_FOUND.value: {
             "description": HTTPStatus.NOT_FOUND.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": {"msg": "User does not exist"}}},
+            "content": {"application/json": {"schema": MsgSchema, "example": Msg.not_found.value}},
         },
     }
 
-    def get(self, user_id: str):
+    def get(self, user_id: str) -> Response:
         self.validate_path(UserUUIDSchema)
         self.validate_query(PaginationSchema)
 
         user_history = get_user_history(
             user_id,
-            UserHistorySchema,
             self.validated_query.get("page_num", DefaultPaginator.page_num.value),
             self.validated_query.get("page_items", DefaultPaginator.page_items.value),
         )
         if not user_history:
-            return jsonify({"msg": "History does not exist"}), HTTPStatus.NOT_FOUND.value
+            return make_response(jsonify(MsgSchema().load(Msg.not_found.value)), HTTPStatus.NOT_FOUND.value)
 
-        return jsonify(user_history), HTTPStatus.OK.value
+        return make_response(jsonify(UserHistorySchema(many=True).dump(user_history)), HTTPStatus.OK.value)
 
 
 bp.add_url_rule("/<uuid:user_id>", view_func=ChangeUserView.as_view("change_user"), methods=["PUT"])

@@ -77,7 +77,7 @@ class UserAccessHistory(Base):
 
 
 @backoff(logger, start_sleep_time=0.1, factor=2, border_sleep_time=10)
-def get_user(login: str) -> Optional[User]:
+def get_user_by_login(login: str) -> Optional[User]:
     try:
         user = User.query.filter_by(login=login).one_or_none()
     except OperationalError:
@@ -86,9 +86,9 @@ def get_user(login: str) -> Optional[User]:
 
 
 @backoff(logger, start_sleep_time=0.1, factor=2, border_sleep_time=10)
-def get_user_by_id(user_id: str) -> Optional[User]:
+def get_object_by_id(id: str, obj: type[Base]) -> Optional[Base]:
     try:
-        user = User.query.filter_by(id=user_id).one_or_none()
+        user = obj.query.filter_by(id=id).one_or_none()
     except OperationalError:
         raise RetryExceptionError("Database not available")
     return user
