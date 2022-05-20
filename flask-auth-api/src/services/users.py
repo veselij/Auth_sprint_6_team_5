@@ -13,34 +13,29 @@ from flask_jwt_extended import (
 
 from core.config import config
 from db.cache import get_cache_access, get_cache_refresh
-from db.db import commit_session, db_session
+from db.db import session_manager
 from models.db_models import (
     User,
     UserAccessHistory,
-    get_object_by_id,
-    get_user_by_login,
-    get_user_history_from_db,
+    Role,
 )
+from services.common import get_object_by_field, create_obj_in_db, update_obj_in_db
 from utils.password_hashing import get_password_hash
 
 
 def create_user(username: str, password: str) -> bool:
     user = User(login=username, password=get_password_hash(password))
-    db_session.add(user)
-    if not commit_session():
-        return False
-    return True
+    return create_obj_in_db(user)
 
 
 def log_login_attempt(user_id: str, status: bool) -> None:
     user_agent = request.headers.get("User-Agent")
     login_attempt = UserAccessHistory(user_id=user_id, user_agent=user_agent, login_status=status)
-    db_session.add(login_attempt)
-    commit_session()
+    create_obj_in_db(login_attempt)
 
 
 def autorize_user(login: str, password: str) -> Optional[str]:
-    user = get_user_by_login(login)
+    user = get_object_by_field(User, login=login)
     if not user:
         return
     if not user.check_password(password):
@@ -51,10 +46,8 @@ def autorize_user(login: str, password: str) -> Optional[str]:
 
 
 def generate_tokens(user_id: str) -> dict[str, str]:
-    user = get_object_by_id(user_id, User)
-    if not user:
-        return {}
-    roles = [str(r.id) for r in user.roles]
+    roles = [str(r.id) for r in get_user_roles(user_id)]
+    roles = []
     access_token = create_access_token(identity=user_id, additional_claims={"roles": roles})
     refresh_token = create_refresh_token(identity=user_id, additional_claims={"access_token": get_jti(access_token)})
     cache = get_cache_refresh()
@@ -68,6 +61,7 @@ def check_refresh_token(jwt: dict, user_id: str) -> bool:
     user_id_cache = cache.get_value(key)
     if user_id != user_id_cache:
         return False
+    cache.delete_value(key)
     return True
 
 
@@ -84,7 +78,6 @@ def check_revoked_token(user_id: str, token: dict) -> bool:
         return False
     revoked_tokens = json.loads(revoked_tokens)
     if "all" in revoked_tokens:
-        print(exp, revoked_tokens["all"])
         return exp <= float(revoked_tokens["all"])
     token_revoke_time = revoked_tokens.get(access_token, None)
     if token_revoke_time is None:
@@ -108,10 +101,10 @@ def revoke_access_token(token: dict, user_id: str, all: str) -> None:
     cache.set_value(str(user_id), json.dumps(data), ex=config.refresh_ttl)
 
 
-def update_user_data(user: User, login: str, password: str) -> bool:
-    user.login = login
-    user.password = get_password_hash(password)
-    if not commit_session():
+def update_user_data(user_id: str, fields: dict) -> bool:
+    if 'password' in fields:
+        fields['password'] = get_password_hash(fields['password'])
+    if not update_obj_in_db(User, fileds_to_update=fields, user_id=user_id):
         return False
     return True
 
@@ -123,4 +116,20 @@ def get_user_history(user_id: str, page_num: int, page_items: int) -> Optional[U
 
 
 def get_user(user_id: str) -> Optional[User]:
-    return get_object_by_id(user_id, User)
+    return get_object_by_field(User, user_id=user_id)
+
+
+def get_user_history_from_db(user_id: str, start: int, end: int) -> Optional[UserAccessHistory]:
+    with session_manager() as session:
+        user_access_history = (
+            session.query(UserAccessHistory).filter_by(user_id=user_id)
+            .order_by(UserAccessHistory.login_date.desc())
+            .slice(start, end)
+        )
+    return user_access_history
+
+
+def get_user_roles(user_id: str) -> list[Role]:
+    with session_manager() as session:
+        roles = session.query(Role).join(User.roles).filter(User.id == user_id).all()
+    return roles

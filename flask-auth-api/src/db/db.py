@@ -1,5 +1,7 @@
+from contextlib import contextmanager
+
 from sqlalchemy import create_engine
-from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import scoped_session, sessionmaker
 
@@ -15,6 +17,8 @@ engine = create_engine(
         database=config.pg_database,
     ),
     convert_unicode=True,
+    pool_size=10,
+    max_overflow=20,
 )
 
 db_session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
@@ -33,13 +37,10 @@ def init_db():
         raise RetryExceptionError("Database not available")
 
 
-@backoff(logger, start_sleep_time=0.1, factor=2, border_sleep_time=10)
-def commit_session() -> bool:
+@contextmanager
+def session_manager():
+    session = db_session()
     try:
-        db_session.commit()
-    except IntegrityError:
-        return False
-    except OperationalError:
-        db_session.rollback()
-        raise RetryExceptionError("Database not available")
-    return True
+        yield session
+    finally:
+        session.close()

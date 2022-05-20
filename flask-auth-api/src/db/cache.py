@@ -45,7 +45,7 @@ class CacheManager:
         except self.exc:
             raise RetryExceptionError("Cache is not available")
 
-    @backoff(logger, start_sleep_time=0.1, factor=2, border_sleep_time=10)
+    backoff(logger, start_sleep_time=0.1, factor=2, border_sleep_time=10)
     def delete_value(self, name: str) -> Optional[bool]:
         try:
             self.cache.delete(name)

@@ -1,12 +1,13 @@
-import os
 from functools import wraps
+
+import os
 from http import HTTPStatus
 
 from flask import jsonify, request
 from flask_jwt_extended import get_jwt, get_jwt_identity, verify_jwt_in_request
 
-from api.v1.msg import Msg
-from api.v1.users_schemas import MsgSchema
+from core.msg import Msg
+from models.users_response_schemas import MsgSchema
 from services.users import check_revoked_token, get_user
 
 

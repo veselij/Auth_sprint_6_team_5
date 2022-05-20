@@ -13,7 +13,7 @@ sequenceDiagram
 ```
 
 **Path**: /users/logout/{user_id}?all_devices=false
-**Type**: Post  
+**Type**: Get  
 **Header**: Authorization: Bearer {token}  
 **Body**: None  
 **Response Body**: None  

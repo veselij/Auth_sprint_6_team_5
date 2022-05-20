@@ -6,9 +6,9 @@ from flask.wrappers import Response
 from flask_jwt_extended import get_jwt
 
 from api.v1.common_view import CustomSwaggerView
-from api.v1.decorators import jwt_verification, revoked_token_check
-from api.v1.msg import Msg
-from api.v1.users_schemas import (
+from utils.view_decorators import jwt_verification, revoked_token_check
+from core.msg import Msg
+from models.users_response_schemas import (
     AllDevicesSchema,
     AuthSchema,
     DefaultPaginator,
@@ -109,7 +109,7 @@ class RefreshView(CustomSwaggerView):
         },
     }
 
-    def post(self, user_id: UUID) -> Response:
+    def get(self, user_id: UUID) -> Response:
         user = str(user_id)
         self.validate_path(UserUUIDSchema)
         token = get_jwt()
@@ -138,7 +138,7 @@ class LogoutView(CustomSwaggerView):
         },
     }
 
-    def post(self, user_id: str) -> Response:
+    def get(self, user_id: str) -> Response:
         self.validate_path(UserUUIDSchema)
         self.validate_query(AllDevicesSchema)
         token = get_jwt()
@@ -183,7 +183,7 @@ class ChangeUserView(CustomSwaggerView):
         if not user:
             return make_response(jsonify(MsgSchema().load(Msg.not_found.value)), HTTPStatus.NOT_FOUND.value)
 
-        if not update_user_data(user, self.validated_body["login"], self.validated_body["password"]):
+        if not update_user_data(user, self.validated_body):
             return make_response(jsonify(MsgSchema().load(Msg.login_already_exists.value)), HTTPStatus.CONFLICT.value)
         return make_response(jsonify(MsgSchema().load(Msg.ok.value)), HTTPStatus.OK.value)
 
@@ -251,6 +251,6 @@ class UserHistoryView(CustomSwaggerView):
 bp.add_url_rule("/<uuid:user_id>", view_func=ChangeUserView.as_view("change_user"), methods=["PUT"])
 bp.add_url_rule("/register", view_func=RegistrationView.as_view("register"), methods=["POST"])
 bp.add_url_rule("/login", view_func=LoginView.as_view("login"), methods=["POST"])
-bp.add_url_rule("/refresh/<uuid:user_id>", view_func=RefreshView.as_view("refresh"), methods=["POST"])
-bp.add_url_rule("/logout/<uuid:user_id>", view_func=LogoutView.as_view("logout"), methods=["POST"])
+bp.add_url_rule("/refresh/<uuid:user_id>", view_func=RefreshView.as_view("refresh"), methods=["GET"])
+bp.add_url_rule("/logout/<uuid:user_id>", view_func=LogoutView.as_view("logout"), methods=["GET"])
 bp.add_url_rule("/history/<uuid:user_id>", view_func=UserHistoryView.as_view("history"), methods=["GET"])
