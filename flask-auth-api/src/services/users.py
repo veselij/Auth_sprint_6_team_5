@@ -49,7 +49,7 @@ def generate_tokens(user_id: str) -> dict[str, str]:
     roles = [str(r.id) for r in get_user_roles(user_id)]
     roles = []
     access_token = create_access_token(identity=user_id, additional_claims={"roles": roles})
-    refresh_token = create_refresh_token(identity=user_id, additional_claims={"access_token": get_jti(access_token)})
+    refresh_token = create_refresh_token(identity=user_id, additional_claims={"related_access_token": get_jti(access_token)})
     cache = get_cache_refresh()
     cache.set_value(name=str(get_jti(refresh_token)), value=user_id, ex=config.refresh_ttl)
     return {"access_token": access_token, "refresh_token": refresh_token}
@@ -61,17 +61,16 @@ def check_refresh_token(jwt: dict, user_id: str) -> bool:
     user_id_cache = cache.get_value(key)
     if user_id != user_id_cache:
         return False
-    cache.delete_value(key)
     return True
 
 
 def check_revoked_token(user_id: str, token: dict) -> bool:
-    if "access_token" in token:
-        access_token = token["access_token"]
-        exp = token["exp"] - config.access_ttl
-    else:
-        access_token = get_jwt_identity()
+    if "related_access_token" in token:
+        access_token = token["related_access_token"]
         exp = token["exp"] - config.refresh_ttl
+    else:
+        access_token = token["jti"]
+        exp = token["exp"] - config.access_ttl
     cache = get_cache_access()
     revoked_tokens = cache.get_value(user_id)
     if not revoked_tokens:
@@ -101,22 +100,22 @@ def revoke_access_token(token: dict, user_id: str, all: str) -> None:
     cache.set_value(str(user_id), json.dumps(data), ex=config.refresh_ttl)
 
 
-def update_user_data(user_id: str, fields: dict) -> bool:
+def update_user_data(user: User, fields: dict) -> bool:
     if 'password' in fields:
         fields['password'] = get_password_hash(fields['password'])
-    if not update_obj_in_db(User, fileds_to_update=fields, user_id=user_id):
+    if not update_obj_in_db(obj=User, fileds_to_update=fields, id=user.id):
         return False
     return True
 
 
 def get_user_history(user_id: str, page_num: int, page_items: int) -> Optional[UserAccessHistory]:
-    start = (page_num - 1) * page_items + 1
+    start = (page_num - 1) * page_items
     end = start + page_items
     return get_user_history_from_db(user_id, start, end)
 
 
 def get_user(user_id: str) -> Optional[User]:
-    return get_object_by_field(User, user_id=user_id)
+    return get_object_by_field(User, id=user_id)
 
 
 def get_user_history_from_db(user_id: str, start: int, end: int) -> Optional[UserAccessHistory]:

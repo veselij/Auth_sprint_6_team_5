@@ -6,4 +6,6 @@ import psycogreen.gevent
 
 psycogreen.gevent.patch_psycopg()
 
-from main import app
+from main import create_app
+
+app = create_app()
