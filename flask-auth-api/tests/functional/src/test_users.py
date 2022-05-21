@@ -8,7 +8,7 @@ from testdata.users import user_data, user_login, update_user_data
 
 
 
-url = f'http://{config.api_ip}:{config.api_port}/users'
+url = f'http://{config.api_ip}:{config.api_port}/api/v1/users'
 
 
 @dataclass
@@ -54,7 +54,7 @@ async def test_login(data, code, make_post_request, clear_db_tables,  get_from_r
 @pytest.mark.asyncio
 async def test_refresh(make_get_request, clear_db_tables, clear_redis, get_from_redis, prepare_user):
 
-    _, headers_refresh, uuid = await prepare_user(url)
+    _, headers_refresh, uuid = await prepare_user(url, user_data[0][0])
 
     response = await make_get_request(url=f'{url}/refresh/{uuid}', headers=headers_refresh)
 
@@ -68,7 +68,7 @@ async def test_logout(make_get_request, clear_db_tables, clear_redis, prepare_us
     headers = []
 
     for _ in range(2):
-        headers_access, headers_refresh, uuid = await prepare_user(url)
+        headers_access, headers_refresh, uuid = await prepare_user(url, user_data[0][0])
         headers.append(Header(headers_access, headers_refresh, uuid))
 
     uuid = headers[0].uuid
@@ -95,7 +95,7 @@ async def test_logout_all(make_get_request, clear_db_tables, clear_redis, prepar
         uuid: str
 
     for _ in range(2):
-        headers_access, headers_refresh, uuid = await prepare_user(url)
+        headers_access, headers_refresh, uuid = await prepare_user(url, user_data[0][0])
         headers.append(Header(headers_access, headers_refresh, uuid))
 
     uuid = headers[0].uuid
@@ -113,7 +113,7 @@ async def test_logout_all(make_get_request, clear_db_tables, clear_redis, prepar
 @pytest.mark.asyncio
 async def test_user_change(make_post_request, make_put_request, clear_db_tables, clear_redis, get_from_redis, prepare_user):
 
-    headers_access, _, uuid = await prepare_user(url)
+    headers_access, _, uuid = await prepare_user(url, user_data[0][0])
 
     response = await make_put_request(url=f'{url}/{uuid}', headers=headers_access, data=update_user_data)
     assert response.status == HTTPStatus.OK
@@ -130,11 +130,36 @@ async def test_user_history(make_get_request, clear_db_tables, clear_redis, prep
 
     headers_access = None
     uuid = None
-    headers_access, _, uuid = await prepare_user(url)
+    headers_access, _, uuid = await prepare_user(url, user_data[0][0])
 
     response = await make_get_request(url=f'{url}/history/{uuid}?page_num=1&page_items=5', headers=headers_access)
 
     assert response.status == HTTPStatus.OK
     assert len(response.body) == 1
 
+
+@pytest.mark.asyncio
+async def test_superuser_change_normal_user(make_post_request, make_put_request, clear_db_tables, clear_redis, prepare_user, make_superuser, get_from_redis):
+
+    _, _, uuid_normal = await prepare_user(url, user_data[0][0])
+    headers_access_super, _, uuid_super = await prepare_user(url, user_data[3][0])
+    make_superuser(uuid_super)
+
+    response = await make_put_request(url=f'{url}/{uuid_normal}', headers=headers_access_super, data=update_user_data)
+    assert response.status == HTTPStatus.OK
+
+    response = await make_post_request(url=f'{url}/login', data=update_user_data)
+
+    assert response.status == HTTPStatus.OK
+
+    assert await check_tokens(response, get_from_redis)
+
+@pytest.mark.asyncio
+async def test_normal_user_change_normal_user(make_post_request, make_put_request, clear_db_tables, clear_redis, prepare_user):
+
+    _, _, uuid_normal = await prepare_user(url, user_data[0][0])
+    headers_access_normal2, _, _ = await prepare_user(url, user_data[3][0])
+
+    response = await make_put_request(url=f'{url}/{uuid_normal}', headers=headers_access_normal2, data=update_user_data)
+    assert response.status == HTTPStatus.UNAUTHORIZED
 

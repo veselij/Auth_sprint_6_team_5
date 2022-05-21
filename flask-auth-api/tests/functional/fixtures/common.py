@@ -74,10 +74,10 @@ def make_put_request(web_client):
 
 @pytest.fixture
 def prepare_user(make_post_request):
-    async def inner(url):
-        await make_post_request(url=f'{url}/register', data=user_data[0][0])
+    async def inner(url: str, user_data: dict):
+        await make_post_request(url=f'{url}/register', data=user_data)
 
-        response = await make_post_request(url=f'{url}/login', data=user_data[0][0])
+        response = await make_post_request(url=f'{url}/login', data=user_data)
         
         refresh_token = response.body["refresh_token"]
         headers_refresh = {"Authorization": f"Bearer {refresh_token}"}
