@@ -1,0 +1,7 @@
+aiohttp
+pytest-asyncio
+pytest
+multidict
+aioredis
+psycopg2
+pyjwt
