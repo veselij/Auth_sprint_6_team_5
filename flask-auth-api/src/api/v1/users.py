@@ -29,7 +29,7 @@ from services.users import (
     update_user_data,
 )
 
-bp = Blueprint("users", __name__, url_prefix="/users")
+bp = Blueprint("users", __name__, url_prefix="/api/v1/users")
 
 
 class RegistrationView(CustomSwaggerView):

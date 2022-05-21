@@ -25,6 +25,11 @@ user_data = (
     },
     HTTPStatus.BAD_REQUEST,
     ),
+    (
+    {"login": "super", "password": "password1"},
+    {'msg': 'User successfully created'},
+    HTTPStatus.CREATED,
+    ),
 )
 
 user_login = (
