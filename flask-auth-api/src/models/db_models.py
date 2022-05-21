@@ -6,6 +6,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from db.db import Base
+from utils.password_hashing import verify_password
 
 user_role_association_table = Table(
     "user_roles",
@@ -31,6 +32,9 @@ class User(Base):
 
     def __repr__(self) -> str:
         return "User {0}".format(self.login)
+
+    def check_password(self, password):
+        return verify_password(password, self.password)
 
 
 class Role(Base):

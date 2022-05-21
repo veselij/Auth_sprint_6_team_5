@@ -4,11 +4,11 @@ sequenceDiagram
     participant S as Auth Server
     participant R as Redis
 
-	Note over C, S: Add role to user
-	C->>S: https://x.x.x.x/users/{user_id}/roles
+	Note over C, S: Delete role from user
+	C->>S: https://x.x.x.x/roles/user/{user_id}
 	S->>S: check uuid from jwt same as in query if not is super user and token valid
 	S-->>C: 401 Unauthorized
-	S->>S: Add role to user
+	S->>S: Delete role from user
 	S-->>C: Not Found (404)
 	alt if uuid_query=jwt_uuid
 	S->>R: delete refresh token, put access token to disabled table
@@ -22,9 +22,9 @@ sequenceDiagram
 
 ```
 
-**Path**: /users/{user_uuid}/roles
+**Path**: /roles/user/{user_id}
 
-**Type**: POST
+**Type**: DELETE
 **Header**: Authorization: Bearer {token}  
 **Body**: 
 ```
@@ -42,5 +42,3 @@ sequenceDiagram
 
 Token time to live 1 day
 Token refresh time to live 10 days
-
-If superuser add role to user - user will get new role only after token refresh (mainly after expire time)

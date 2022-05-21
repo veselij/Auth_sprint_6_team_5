@@ -1,20 +1,18 @@
-import click
 from getpass import getpass
 from typing import Optional
 
+import click
 from flask.cli import AppGroup
 
+from core.config import config
 from db.db import db_session
 from models.db_models import User
-from core.config import config
 from utils.password_hashing import get_password_hash
-
 
 superuser_cli = AppGroup("superuser")
 
 
 class InvalidUserDataError(Exception):
-
     def __init__(self, message) -> None:
         self.message = message
         super().__init__(self.message)
@@ -65,9 +63,9 @@ def create_superuser():
     password: Optional[str] = config.superuser_password
 
     if not name or not password:
-        raise InvalidUserDataError('password or name not specified')
+        raise InvalidUserDataError("password or name not specified")
     if User.query.filter_by(login=name).first():
-        raise InvalidUserDataError('user already exisit')
+        raise InvalidUserDataError("user already exisit")
 
     user = User(login=name, password=get_password_hash(password), is_superuser=True)
     db_session.add(user)
