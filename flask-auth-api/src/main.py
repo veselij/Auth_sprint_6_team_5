@@ -7,7 +7,6 @@ from flask_jwt_extended import JWTManager
 import api.v1.users as users_api
 from commands.superuser import superuser_cli
 from core.config import config, SWAGGER_TEMPLATE
-from db.db import init_db
 
 
 def create_app() -> Flask:

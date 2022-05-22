@@ -18,16 +18,10 @@ from models.users_response_schemas import (
     UserHistorySchema,
     UserUUIDSchema,
 )
-from services.users import (
-    autorize_user,
-    check_refresh_token,
-    create_user,
-    generate_tokens,
-    get_user,
-    get_user_history,
-    revoke_access_token,
-    update_user_data,
-)
+from services.users import UserServie
+from repository.repository import Repositiry
+from db.db import session_manager
+from db.cache import caches
 
 bp = Blueprint("users", __name__, url_prefix="/api/v1/users")
 
@@ -55,7 +49,11 @@ class RegistrationView(CustomSwaggerView):
 
     def post(self) -> Response:
         self.validate_body(AuthSchema)
-        created = create_user(self.validated_body["login"], self.validated_body["password"])
+
+        repository = Repositiry(session_manager)
+        user_service = UserServie(repository, caches)
+
+        created = user_service.create_user(self.validated_body["login"], self.validated_body["password"])
         if not created:
             return make_response(jsonify(MsgSchema().load(Msg.user_alredy_exists.value)), HTTPStatus.CONFLICT.value)
         return make_response(jsonify(MsgSchema().load(Msg.created.value)), HTTPStatus.CREATED.value)
@@ -84,10 +82,14 @@ class LoginView(CustomSwaggerView):
 
     def post(self) -> Response:
         self.validate_body(AuthSchema)
-        user_id = autorize_user(self.validated_body["login"], self.validated_body["password"])
-        if not user_id:
+
+        repository = Repositiry(session_manager)
+        user_service = UserServie(repository, caches)
+
+        user = user_service.autorize_user(self.validated_body["login"], self.validated_body["password"])
+        if not user:
             return make_response(jsonify(MsgSchema().load(Msg.unauthorized.value)), HTTPStatus.UNAUTHORIZED.value)
-        return make_response(jsonify(TokenSchema().load(generate_tokens(user_id))), HTTPStatus.OK.value)
+        return make_response(jsonify(TokenSchema().load(user_service.generate_tokens(str(user.id), user.is_superuser))), HTTPStatus.OK.value)
 
 
 class RefreshView(CustomSwaggerView):
@@ -112,10 +114,14 @@ class RefreshView(CustomSwaggerView):
     def get(self, user_id: UUID) -> Response:
         user = str(user_id)
         self.validate_path(UserUUIDSchema)
+
+        repository = Repositiry(session_manager)
+        user_service = UserServie(repository, caches)
+
         token = get_jwt()
-        if not check_refresh_token(token, user):
+        if not user_service.check_refresh_token(token, user):
             return make_response(jsonify(MsgSchema().load(Msg.unauthorized.value)), HTTPStatus.UNAUTHORIZED.value)
-        return make_response(jsonify(TokenSchema().load(generate_tokens(user))), HTTPStatus.OK.value)
+        return make_response(jsonify(TokenSchema().load(user_service.generate_tokens(user, token['admin']))), HTTPStatus.OK.value)
 
 
 class LogoutView(CustomSwaggerView):
@@ -141,8 +147,12 @@ class LogoutView(CustomSwaggerView):
     def get(self, user_id: str) -> Response:
         self.validate_path(UserUUIDSchema)
         self.validate_query(AllDevicesSchema)
+
+        repository = Repositiry(session_manager)
+        user_service = UserServie(repository, caches)
+
         token = get_jwt()
-        revoke_access_token(token, user_id, self.validated_query["all_devices"])
+        user_service.revoke_access_token(token, user_id, self.validated_query["all_devices"])
         return make_response(jsonify(MsgSchema().load(Msg.ok.value)), HTTPStatus.OK.value)
 
 
@@ -179,11 +189,14 @@ class ChangeUserView(CustomSwaggerView):
         self.validate_body(AuthSchema)
         self.validate_path(UserUUIDSchema)
 
-        user = get_user(user_id)
+        repository = Repositiry(session_manager)
+        user_service = UserServie(repository, caches)
+
+        user = user_service.get_user(user_id)
         if not user:
             return make_response(jsonify(MsgSchema().load(Msg.not_found.value)), HTTPStatus.NOT_FOUND.value)
 
-        if not update_user_data(user, self.validated_body):
+        if not user_service.update_user_data(user, self.validated_body):
             return make_response(jsonify(MsgSchema().load(Msg.login_already_exists.value)), HTTPStatus.CONFLICT.value)
         return make_response(jsonify(MsgSchema().load(Msg.ok.value)), HTTPStatus.OK.value)
 
@@ -237,7 +250,10 @@ class UserHistoryView(CustomSwaggerView):
         self.validate_path(UserUUIDSchema)
         self.validate_query(PaginationSchema)
 
-        user_history = get_user_history(
+        repository = Repositiry(session_manager)
+        user_service = UserServie(repository, caches)
+
+        user_history = user_service.get_user_history(
             user_id,
             self.validated_query.get("page_num", DefaultPaginator.page_num.value),
             self.validated_query.get("page_items", DefaultPaginator.page_items.value),

@@ -31,7 +31,7 @@ class CacheManager:
     @backoff(logger, start_sleep_time=0.1, factor=2, border_sleep_time=10)
     def get_value(self, key: str) -> Optional[str]:
         try:
-            value = self.cache.get(key)
+            value = self.cache.get(str(key))
         except self.exc:
             raise RetryExceptionError("Cache is not available")
         if value:
@@ -41,7 +41,7 @@ class CacheManager:
     @backoff(logger, start_sleep_time=0.1, factor=2, border_sleep_time=10)
     def set_value(self, name: str, value: str, ex: int) -> None:
         try:
-            self.cache.set(name, value, ex)
+            self.cache.set(str(name), value, ex)
         except self.exc:
             raise RetryExceptionError("Cache is not available")
 
@@ -52,10 +52,9 @@ class CacheManager:
         except self.exc:
             raise RetryExceptionError("Cache is not available")
 
+@dataclass
+class Caches:
+    access_cache: CacheManager
+    refresh_cache: CacheManager
 
-def get_cache_access() -> CacheManager:
-    return CacheManager(Redis(connection_pool=POOL_ACCESS_TOKENS), ConnectionError)
-
-
-def get_cache_refresh() -> CacheManager:
-    return CacheManager(Redis(connection_pool=POOL_REFRESH_TOKENS), ConnectionError)
+caches = Caches(CacheManager(Redis(connection_pool=POOL_ACCESS_TOKENS), ConnectionError), CacheManager(Redis(connection_pool=POOL_REFRESH_TOKENS), ConnectionError))

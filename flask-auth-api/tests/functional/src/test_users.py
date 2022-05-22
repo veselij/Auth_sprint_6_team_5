@@ -144,6 +144,7 @@ async def test_superuser_change_normal_user(make_post_request, make_put_request,
     _, _, uuid_normal = await prepare_user(url, user_data[0][0])
     headers_access_super, _, uuid_super = await prepare_user(url, user_data[3][0])
     make_superuser(uuid_super)
+    headers_access_super, _, uuid_super = await prepare_user(url, user_data[3][0])
 
     response = await make_put_request(url=f'{url}/{uuid_normal}', headers=headers_access_super, data=update_user_data)
     assert response.status == HTTPStatus.OK
