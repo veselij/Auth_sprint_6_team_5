@@ -88,12 +88,6 @@ async def test_logout_all(make_get_request, clear_db_tables, clear_redis, prepar
 
     headers = []
 
-    @dataclass
-    class Header:
-        header_access: dict
-        header_refresh: dict
-        uuid: str
-
     for _ in range(2):
         headers_access, headers_refresh, uuid = await prepare_user(url, user_data[0][0])
         headers.append(Header(headers_access, headers_refresh, uuid))
