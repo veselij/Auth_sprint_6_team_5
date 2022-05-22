@@ -34,6 +34,8 @@ class AllDevicesSchema(Schema):
 class UserUUIDSchema(Schema):
     user_id = fields.UUID(required=True)
 
+class RoleUUIDSchema(Schema):
+    role_id = fields.UUID(required=True)
 
 class UserHistorySchema(Schema):
     id = fields.UUID()
@@ -48,3 +50,9 @@ class PaginationSchema(Schema):
     page_items = fields.Int(
         validate=Range(DefaultPaginator.min_page_items.value, DefaultPaginator.max_page_items.value)
     )
+
+
+class RoleSchema(Schema):
+    id = fields.UUID(required=False)
+    role = fields.Str(required=True)
+    description = fields.Str(required=True)

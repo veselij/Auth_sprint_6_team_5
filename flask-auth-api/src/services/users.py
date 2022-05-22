@@ -21,7 +21,7 @@ from repository.repository import Repositiry
 from utils.password_hashing import get_password_hash
 
 
-class UserServie:
+class UserService:
 
     def __init__(self, repository: Repositiry, cache: Caches) -> None:
         self.repository = repository

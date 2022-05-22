@@ -1,15 +1,11 @@
 from dataclasses import dataclass
 from typing import Optional, Protocol, Type
 
-from redis import ConnectionPool, Redis
-from redis.exceptions import ConnectionError
+from redis import Redis, ConnectionError, ConnectionPool
 
-from core.config import config, logger
+from core.config import logger, config
 from utils.decorators import backoff
 from utils.exceptions import RetryExceptionError
-
-POOL_ACCESS_TOKENS = ConnectionPool(host=config.redis_host, port=config.redis_port, db=0)
-POOL_REFRESH_TOKENS = ConnectionPool(host=config.redis_host, port=config.redis_port, db=1)
 
 
 class Cache(Protocol):
@@ -54,7 +50,6 @@ class CacheManager:
 
 @dataclass
 class Caches:
-    access_cache: CacheManager
-    refresh_cache: CacheManager
+    access_cache: CacheManager = CacheManager(Redis(connection_pool=ConnectionPool(host=config.redis_host, port=config.redis_port, db=0)), ConnectionError)
+    refresh_cache: CacheManager = CacheManager(Redis(connection_pool=ConnectionPool(host=config.redis_host, port=config.redis_port, db=1)), ConnectionError)
 
-caches = Caches(CacheManager(Redis(connection_pool=POOL_ACCESS_TOKENS), ConnectionError), CacheManager(Redis(connection_pool=POOL_REFRESH_TOKENS), ConnectionError))

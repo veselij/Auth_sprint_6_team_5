@@ -59,7 +59,10 @@ class Repositiry:
     def get_objects_by_field(self, obj: type[Base], **kwargs) -> Optional[Base]:
         with self.session_factory() as session:
             try:
-                obj_instance = session.query(obj).filter_by(**kwargs)
+                if kwargs:
+                    obj_instance = session.query(obj).filter_by(**kwargs)
+                else:
+                    obj_instance = session.query(obj).all()
             except OperationalError:
                 raise RetryExceptionError('Database not available')
         return obj_instance
@@ -72,3 +75,16 @@ class Repositiry:
             except OperationalError:
                 raise RetryExceptionError('Database not available')
         return objs
+
+    def delete_object_by_field(self, obj: type[Base], **kwargs) -> bool:
+        with self.session_factory() as session:
+            try:
+                obj = session.query(obj).filter_by(**kwargs).one_or_none()
+                if not obj:
+                    return False
+                session.delete(obj)
+                session.commit()
+            except OperationalError:
+                session.rollback()
+                raise RetryExceptionError('Database not available')
+            return True

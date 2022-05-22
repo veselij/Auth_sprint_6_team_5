@@ -4,7 +4,7 @@ from http import HTTPStatus
 user_data = (
     (
     {"login": "user1", "password": "password1"},
-    {'msg': 'User successfully created'},
+    {'msg': 'Object successfully created'},
     HTTPStatus.CREATED,
     ),
     (
@@ -27,7 +27,7 @@ user_data = (
     ),
     (
     {"login": "super", "password": "password1"},
-    {'msg': 'User successfully created'},
+    {'msg': 'Object successfully created'},
     HTTPStatus.CREATED,
     ),
 )
