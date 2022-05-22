@@ -5,12 +5,16 @@ import click
 from flask.cli import AppGroup
 
 from core.config import config
-from db.db import db_session
+from db.db import Database
 from models.db_models import User
 from utils.password_hashing import get_password_hash
+from repository.repository import Repositiry
 
 superuser_cli = AppGroup("superuser")
 
+
+db = Database()
+repository = Repositiry(db.session_manager)
 
 class InvalidUserDataError(Exception):
     def __init__(self, message) -> None:
@@ -47,15 +51,15 @@ def create_superuser_int():
     password: str
 
     name = read_name("Please specify superuser name: ")
-    while User.query.filter_by(login=name).first():
+    while repository.get_object_by_field(User, login=name):
         print("Username {0} already exists".format(name))
         name = read_name("Please specify superuser name: ")
 
     password = get_password()
 
     user = User(login=name, password=get_password_hash(password), is_superuser=True)
-    db_session.add(user)
-    db_session.commit()
+
+    repository.create_obj_in_db(user)
 
 
 def create_superuser():
@@ -64,12 +68,11 @@ def create_superuser():
 
     if not name or not password:
         raise InvalidUserDataError("password or name not specified")
-    if User.query.filter_by(login=name).first():
+    if repository.get_object_by_field(User, login=name):
         raise InvalidUserDataError("user already exisit")
 
     user = User(login=name, password=get_password_hash(password), is_superuser=True)
-    db_session.add(user)
-    db_session.commit()
+    repository.create_obj_in_db(user)
 
 
 @superuser_cli.command("create")
@@ -89,9 +92,9 @@ def create_superuser_command(interactive):
 @superuser_cli.command("reset-password")
 @click.argument("login")
 def reset_password(login):
-    user = User.query.filter_by(login=login).first()
+    user = repository.get_object_by_field(User, login=login)
     if not user:
         raise InvalidUserDataError("User {0} does not exists".format(login))
     password: str = get_password()
-    user.password = get_password_hash(password)
-    db_session.commit()
+    password_hash = get_password_hash(password)
+    repository.update_obj_in_db(User, {"password": password_hash}, login=login)

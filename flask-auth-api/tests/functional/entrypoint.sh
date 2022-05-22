@@ -10,6 +10,3 @@ echo "starting tests"
 python -m pytest src/
 echo "tests finished"
 
-
-exec "$@"
-

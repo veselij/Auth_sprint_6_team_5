@@ -4,6 +4,7 @@ from uuid import UUID
 from flask import Blueprint, jsonify, make_response
 from flask.wrappers import Response
 from flask_jwt_extended import get_jwt
+from dependency_injector.wiring import inject, Provide
 
 from api.v1.common_view import CustomSwaggerView
 from utils.view_decorators import jwt_verification, revoked_token_check
@@ -18,10 +19,8 @@ from models.users_response_schemas import (
     UserHistorySchema,
     UserUUIDSchema,
 )
-from services.users import UserServie
-from repository.repository import Repositiry
-from db.db import session_manager
-from db.cache import caches
+from services.users import UserService
+from containers.container import Container
 
 bp = Blueprint("users", __name__, url_prefix="/api/v1/users")
 
@@ -43,19 +42,16 @@ class RegistrationView(CustomSwaggerView):
         },
         HTTPStatus.CONFLICT.value: {
             "description": HTTPStatus.CONFLICT.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": Msg.user_alredy_exists.value}},
+            "content": {"application/json": {"schema": MsgSchema, "example": Msg.alredy_exists.value}},
         },
     }
-
-    def post(self) -> Response:
+    @inject
+    def post(self, user_service: UserService = Provide[Container.user_service]) -> Response:
         self.validate_body(AuthSchema)
-
-        repository = Repositiry(session_manager)
-        user_service = UserServie(repository, caches)
 
         created = user_service.create_user(self.validated_body["login"], self.validated_body["password"])
         if not created:
-            return make_response(jsonify(MsgSchema().load(Msg.user_alredy_exists.value)), HTTPStatus.CONFLICT.value)
+            return make_response(jsonify(MsgSchema().load(Msg.alredy_exists.value)), HTTPStatus.CONFLICT.value)
         return make_response(jsonify(MsgSchema().load(Msg.created.value)), HTTPStatus.CREATED.value)
 
 
@@ -80,12 +76,11 @@ class LoginView(CustomSwaggerView):
         },
     }
 
-    def post(self) -> Response:
+    @inject
+    def post(self, user_service: UserService = Provide[Container.user_service]) -> Response:
         self.validate_body(AuthSchema)
 
-        repository = Repositiry(session_manager)
-        user_service = UserServie(repository, caches)
-
+        print((user_service))
         user = user_service.autorize_user(self.validated_body["login"], self.validated_body["password"])
         if not user:
             return make_response(jsonify(MsgSchema().load(Msg.unauthorized.value)), HTTPStatus.UNAUTHORIZED.value)
@@ -111,12 +106,10 @@ class RefreshView(CustomSwaggerView):
         },
     }
 
-    def get(self, user_id: UUID) -> Response:
+    @inject
+    def get(self, user_id: UUID, user_service: UserService = Provide[Container.user_service]) -> Response:
         user = str(user_id)
         self.validate_path(UserUUIDSchema)
-
-        repository = Repositiry(session_manager)
-        user_service = UserServie(repository, caches)
 
         token = get_jwt()
         if not user_service.check_refresh_token(token, user):
@@ -144,12 +137,10 @@ class LogoutView(CustomSwaggerView):
         },
     }
 
-    def get(self, user_id: str) -> Response:
+    @inject
+    def get(self, user_id: str, user_service: UserService = Provide[Container.user_service]) -> Response:
         self.validate_path(UserUUIDSchema)
         self.validate_query(AllDevicesSchema)
-
-        repository = Repositiry(session_manager)
-        user_service = UserServie(repository, caches)
 
         token = get_jwt()
         user_service.revoke_access_token(token, user_id, self.validated_query["all_devices"])
@@ -181,23 +172,21 @@ class ChangeUserView(CustomSwaggerView):
         },
         HTTPStatus.CONFLICT.value: {
             "description": HTTPStatus.CONFLICT.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": Msg.login_already_exists.value}},
+            "content": {"application/json": {"schema": MsgSchema, "example": Msg.alredy_exists.value}},
         },
     }
 
-    def put(self, user_id: str) -> Response:
+    @inject
+    def put(self, user_id: str, user_service: UserService = Provide[Container.user_service]) -> Response:
         self.validate_body(AuthSchema)
         self.validate_path(UserUUIDSchema)
-
-        repository = Repositiry(session_manager)
-        user_service = UserServie(repository, caches)
 
         user = user_service.get_user(user_id)
         if not user:
             return make_response(jsonify(MsgSchema().load(Msg.not_found.value)), HTTPStatus.NOT_FOUND.value)
 
         if not user_service.update_user_data(user, self.validated_body):
-            return make_response(jsonify(MsgSchema().load(Msg.login_already_exists.value)), HTTPStatus.CONFLICT.value)
+            return make_response(jsonify(MsgSchema().load(Msg.alredy_exists.value)), HTTPStatus.CONFLICT.value)
         return make_response(jsonify(MsgSchema().load(Msg.ok.value)), HTTPStatus.OK.value)
 
 
@@ -246,12 +235,10 @@ class UserHistoryView(CustomSwaggerView):
         },
     }
 
-    def get(self, user_id: str) -> Response:
+    @inject
+    def get(self, user_id: str, user_service: UserService = Provide[Container.user_service]) -> Response:
         self.validate_path(UserUUIDSchema)
         self.validate_query(PaginationSchema)
-
-        repository = Repositiry(session_manager)
-        user_service = UserServie(repository, caches)
 
         user_history = user_service.get_user_history(
             user_id,
