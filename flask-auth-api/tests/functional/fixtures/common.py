@@ -70,6 +70,20 @@ def make_put_request(web_client):
 
 
 @pytest.fixture
+def make_delete_request(web_client):
+    async def inner(url: str, params: Optional[dict] = None, headers: Optional[dict] = None, data: Optional[dict] = None) -> HTTPResponse:
+        params = params or {}
+        async with web_client.delete(url, params=params, headers=headers) as response:
+            return HTTPResponse(
+                body=await response.json(),
+                headers=response.headers,
+                status=response.status,
+            )
+
+    return inner
+
+
+@pytest.fixture
 def prepare_user(make_post_request):
     async def inner(url: str, user_data: dict):
         await make_post_request(url=f'{url}/register', data=user_data)

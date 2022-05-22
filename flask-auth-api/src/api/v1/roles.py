@@ -20,7 +20,7 @@ bp = Blueprint("roles", __name__, url_prefix="/api/v1/roles")
 
 
 class Role(CustomSwaggerView):
-    #decorators = [revoked_token_check(), jwt_verification(superuser_only=True)]
+    decorators = [revoked_token_check(), jwt_verification(superuser_only=True)]
 
     tags = ["roles"]
 
@@ -72,7 +72,7 @@ class Role(CustomSwaggerView):
 
 
 class ModifyRole(CustomSwaggerView):
-    #decorators = [revoked_token_check(), jwt_verification(superuser_only=True)]
+    decorators = [revoked_token_check(), jwt_verification(superuser_only=True)]
 
     tags = ["roles"]
 
