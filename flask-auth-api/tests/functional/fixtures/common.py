@@ -7,9 +7,6 @@ import pytest
 import pytest_asyncio
 from typing import Optional
 
-from testdata.users import user_data
-
-
 
 @dataclass
 class HTTPResponse:

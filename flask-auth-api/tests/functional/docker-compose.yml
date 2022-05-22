@@ -1,0 +1,65 @@
+version: '3.0'
+
+services:
+  db:
+    image: postgres:13
+    container_name: pg_server
+    networks:
+      - backend_nw
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    env_file:
+      - ../../.postgres.env
+    logging:
+      driver: none
+  redis:
+    image: redis:6.2.6
+    container_name: redis_test
+    networks:
+      - backend_nw
+    volumes:
+      - redis_data_test:/data
+    ports:
+      - 6379:6379
+    logging:
+      driver: none
+  auth:
+    container_name: auth_api
+    build:
+      context: ../../.
+    image: auth
+    networks:
+      - backend_nw
+    volumes:
+      - code_api:/code
+    env_file:
+      - ../../.auth.env
+    entrypoint:
+      - entrypoint.sh
+    ports:
+      - 8000:8000
+    depends_on:
+      - redis
+      - db
+    logging:
+      driver: none
+  tests:
+    container_name: auth_test
+    build:
+      context: .
+    volumes:
+      - code_test:/code_test
+    env_file:
+      - ../../.auth.env
+    networks:
+      - backend_nw
+
+volumes:
+  code_api:
+  code_test:
+  redis_data_test:
+  pg_data:
+
+networks:
+  backend_nw:
+    driver: bridge
