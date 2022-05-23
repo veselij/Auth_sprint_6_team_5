@@ -147,7 +147,7 @@ class UserRoles(CustomSwaggerView):
     responses = {
         HTTPStatus.OK.value: {
             "description": HTTPStatus.OK.phrase,
-            "content": {"application/json": {"schema": TokenSchema, "example": Msg.ok.value}},
+            "content": {"application/json": {"schema": MsgSchema, "example": Msg.ok.value}},
         },
         HTTPStatus.UNAUTHORIZED.value: {
             "description": HTTPStatus.UNAUTHORIZED.phrase,
@@ -168,10 +168,7 @@ class UserRoles(CustomSwaggerView):
         if not created:
             return make_response(jsonify(MsgSchema().load(Msg.not_found.value)), HTTPStatus.NOT_FOUND.value)
 
-        token = get_jwt()
-        return make_response(
-            jsonify(TokenSchema().load(user_service.generate_tokens(str(user_id), token["admin"]))), HTTPStatus.OK.value,
-        )
+        return make_response(jsonify(MsgSchema().load(Msg.ok.value)), HTTPStatus.OK.value)
 
     @inject
     def delete(self, user_id: str, user_service: UserService = Provide[Container.user_service]) -> Response:
@@ -182,10 +179,7 @@ class UserRoles(CustomSwaggerView):
         if not deleted:
             return make_response(jsonify(MsgSchema().load(Msg.not_found.value)), HTTPStatus.NOT_FOUND.value)
 
-        token = get_jwt()
-        return make_response(
-            jsonify(TokenSchema().load(user_service.generate_tokens(str(user_id), token["admin"]))), HTTPStatus.OK.value,
-        )
+        return make_response(jsonify(MsgSchema().load(Msg.ok.value)), HTTPStatus.OK.value)
 
 
 class CheckUserRole(CustomSwaggerView):
@@ -208,10 +202,6 @@ class CheckUserRole(CustomSwaggerView):
             "description": HTTPStatus.UNAUTHORIZED.phrase,
             "content": {"application/json": {"schema": MsgSchema, "example": Msg.unauthorized.value}},
         },
-        HTTPStatus.NOT_FOUND.value: {
-            "description": HTTPStatus.NOT_FOUND.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": Msg.not_found.value}},
-        },
     }
 
     @inject
@@ -219,8 +209,8 @@ class CheckUserRole(CustomSwaggerView):
         self.validate_body(CheckAccessTokenSchema)
 
         roles = user_service.check_user_roles(self.validated_body["access_token"])
-        if not roles:
-            return make_response(jsonify(MsgSchema().load(Msg.not_found.value)), HTTPStatus.NOT_FOUND.value)
+        if roles is None:
+            return make_response(jsonify(MsgSchema().load(Msg.unauthorized.value)), HTTPStatus.UNAUTHORIZED.value)
 
         return make_response(jsonify(UserRoleSchema().load({"role_id": roles})), HTTPStatus.OK.value)
 

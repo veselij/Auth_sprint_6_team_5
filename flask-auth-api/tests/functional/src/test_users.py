@@ -1,14 +1,13 @@
 from dataclasses import dataclass
 from http import HTTPStatus
-import pytest
+
 import jwt
+import pytest
 
 from settings import config
-from testdata.users import user_data, user_login, update_user_data
+from testdata.users import update_user_data, user_data, user_login
 
-
-
-url = f'http://{config.api_ip}:{config.api_port}/api/v1/users'
+url = f"http://{config.api_ip}:{config.api_port}/api/v1/users"
 
 
 @dataclass
@@ -19,34 +18,34 @@ class Header:
 
 
 async def check_tokens(response, func):
-    refresh_token = response.body['refresh_token']
+    refresh_token = response.body["refresh_token"]
     decoded_refresh_token = jwt.decode(refresh_token, options={"verify_signature": False})
-    uuid = decoded_refresh_token['sub']
-    jti = decoded_refresh_token['jti']
+    uuid = decoded_refresh_token["sub"]
+    jti = decoded_refresh_token["jti"]
     uuid_redis = await func(jti)
     return uuid == uuid_redis
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize('data,result,code', user_data)
+@pytest.mark.parametrize("data,result,code", user_data)
 async def test_register(data, result, code, make_post_request, clear_db_tables, clear_redis):
 
-    response = await make_post_request(url=f'{url}/register', data=data)
+    # register user
+    response = await make_post_request(url=f"{url}/register", data=data)
 
     assert response.status == code
-    assert response.body == result 
+    assert response.body == result
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize('data,code', user_login)
-async def test_login(data, code, make_post_request, clear_db_tables,  get_from_redis, clear_redis):
+@pytest.mark.parametrize("data,code", user_login)
+async def test_login(data, code, make_post_request, clear_db_tables, get_from_redis, clear_redis):
 
-    await make_post_request(url=f'{url}/register', data=user_data[0][0])
-
-    response = await make_post_request(url=f'{url}/login', data=data)
+    # login
+    await make_post_request(url=f"{url}/register", data=user_data[0][0])
+    response = await make_post_request(url=f"{url}/login", data=data)
 
     assert response.status == code
-
     if code == HTTPStatus.OK:
         assert await check_tokens(response, get_from_redis)
 
@@ -56,7 +55,7 @@ async def test_refresh(make_get_request, clear_db_tables, clear_redis, get_from_
 
     _, headers_refresh, uuid = await prepare_user(url, user_data[0][0])
 
-    response = await make_get_request(url=f'{url}/refresh/{uuid}', headers=headers_refresh)
+    response = await make_get_request(url=f"{url}/refresh/{uuid}", headers=headers_refresh)
 
     assert response.status == HTTPStatus.OK
     assert await check_tokens(response, get_from_redis)
@@ -67,19 +66,23 @@ async def test_logout(make_get_request, clear_db_tables, clear_redis, prepare_us
 
     headers = []
 
+    # login same user twice (aka 2 devices)
     for _ in range(2):
         headers_access, headers_refresh, uuid = await prepare_user(url, user_data[0][0])
         headers.append(Header(headers_access, headers_refresh, uuid))
 
     uuid = headers[0].uuid
-    response = await make_get_request(url=f'{url}/logout/{uuid}?all_devices=false', headers=headers[0].header_access)
+
+    # logout only one user device
+    response = await make_get_request(url=f"{url}/logout/{uuid}?all_devices=false", headers=headers[0].header_access)
     assert response.status == HTTPStatus.OK
 
-    for header, status in zip(headers,[HTTPStatus.UNAUTHORIZED, HTTPStatus.OK]):
-        response = await make_get_request(url=f'{url}/history/{uuid}', headers=header.header_access)
+    # check that only one device needs re-login
+    for header, status in zip(headers, [HTTPStatus.UNAUTHORIZED, HTTPStatus.OK]):
+        response = await make_get_request(url=f"{url}/history/{uuid}", headers=header.header_access)
         assert response.status == status
 
-        response = await make_get_request(url=f'{url}/refresh/{uuid}', headers=header.header_refresh)
+        response = await make_get_request(url=f"{url}/refresh/{uuid}", headers=header.header_refresh)
         assert response.status == status
 
 
@@ -88,73 +91,85 @@ async def test_logout_all(make_get_request, clear_db_tables, clear_redis, prepar
 
     headers = []
 
+    # login same user twice (aka 2 devices)
     for _ in range(2):
         headers_access, headers_refresh, uuid = await prepare_user(url, user_data[0][0])
         headers.append(Header(headers_access, headers_refresh, uuid))
 
     uuid = headers[0].uuid
-    response = await make_get_request(url=f'{url}/logout/{uuid}?all_devices=true', headers=headers[0].header_access)
+
+    # logout all user device
+    response = await make_get_request(url=f"{url}/logout/{uuid}?all_devices=true", headers=headers[0].header_access)
     assert response.status == HTTPStatus.OK
 
+    # check that all devices needs re-login
     for header in headers:
-        response = await make_get_request(url=f'{url}/history/{uuid}', headers=header.header_access)
+        response = await make_get_request(url=f"{url}/history/{uuid}", headers=header.header_access)
         assert response.status == HTTPStatus.UNAUTHORIZED
 
-        response = await make_get_request(url=f'{url}/refresh/{uuid}', headers=header.header_refresh)
+        response = await make_get_request(url=f"{url}/refresh/{uuid}", headers=header.header_refresh)
         assert response.status == HTTPStatus.UNAUTHORIZED
 
 
 @pytest.mark.asyncio
-async def test_user_change(make_post_request, make_put_request, clear_db_tables, clear_redis, get_from_redis, prepare_user):
+async def test_user_change(
+    make_post_request, make_put_request, clear_db_tables, clear_redis, get_from_redis, prepare_user
+):
 
     headers_access, _, uuid = await prepare_user(url, user_data[0][0])
 
-    response = await make_put_request(url=f'{url}/{uuid}', headers=headers_access, data=update_user_data)
+    # update user
+    response = await make_put_request(url=f"{url}/{uuid}", headers=headers_access, data=update_user_data)
     assert response.status == HTTPStatus.OK
 
-    response = await make_post_request(url=f'{url}/login', data=update_user_data)
-
+    # check that login with new data - OK
+    response = await make_post_request(url=f"{url}/login", data=update_user_data)
     assert response.status == HTTPStatus.OK
-
     assert await check_tokens(response, get_from_redis)
 
 
 @pytest.mark.asyncio
 async def test_user_history(make_get_request, clear_db_tables, clear_redis, prepare_user):
 
-    headers_access = None
-    uuid = None
     headers_access, _, uuid = await prepare_user(url, user_data[0][0])
 
-    response = await make_get_request(url=f'{url}/history/{uuid}?page_num=1&page_items=5', headers=headers_access)
+    response = await make_get_request(url=f"{url}/history/{uuid}?page_num=1&page_items=5", headers=headers_access)
 
     assert response.status == HTTPStatus.OK
     assert len(response.body) == 1
 
 
 @pytest.mark.asyncio
-async def test_superuser_change_normal_user(make_post_request, make_put_request, clear_db_tables, clear_redis, prepare_user, make_superuser, get_from_redis):
+async def test_superuser_change_normal_user(
+    make_post_request, make_put_request, clear_db_tables, clear_redis, prepare_user, make_superuser, get_from_redis
+):
 
     _, _, uuid_normal = await prepare_user(url, user_data[0][0])
+
     headers_access_super, _, uuid_super = await prepare_user(url, user_data[3][0])
     make_superuser(uuid_super)
+
+    # relogin to get new access token with admin=1
     headers_access_super, _, uuid_super = await prepare_user(url, user_data[3][0])
 
-    response = await make_put_request(url=f'{url}/{uuid_normal}', headers=headers_access_super, data=update_user_data)
+    # superuser updates normal user
+    response = await make_put_request(url=f"{url}/{uuid_normal}", headers=headers_access_super, data=update_user_data)
     assert response.status == HTTPStatus.OK
 
-    response = await make_post_request(url=f'{url}/login', data=update_user_data)
-
+    # check that updated user login with new data - OK
+    response = await make_post_request(url=f"{url}/login", data=update_user_data)
     assert response.status == HTTPStatus.OK
-
     assert await check_tokens(response, get_from_redis)
 
+
 @pytest.mark.asyncio
-async def test_normal_user_change_normal_user(make_post_request, make_put_request, clear_db_tables, clear_redis, prepare_user):
+async def test_normal_user_change_normal_user(
+    make_post_request, make_put_request, clear_db_tables, clear_redis, prepare_user
+):
 
     _, _, uuid_normal = await prepare_user(url, user_data[0][0])
     headers_access_normal2, _, _ = await prepare_user(url, user_data[3][0])
 
-    response = await make_put_request(url=f'{url}/{uuid_normal}', headers=headers_access_normal2, data=update_user_data)
+    # normal user change other normal user
+    response = await make_put_request(url=f"{url}/{uuid_normal}", headers=headers_access_normal2, data=update_user_data)
     assert response.status == HTTPStatus.UNAUTHORIZED
-

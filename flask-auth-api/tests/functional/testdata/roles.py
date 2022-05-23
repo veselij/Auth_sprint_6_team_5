@@ -1,4 +1,3 @@
-
 role_data = [
     {"role": "role1", "description": "description1"},
     {"role": "role2", "description": "description2"},
