@@ -1,7 +1,6 @@
 from http import HTTPStatus
 from time import sleep
 
-import jwt
 import pytest
 
 from settings import config

@@ -19,8 +19,8 @@ services:
       - backend_nw
     volumes:
       - redis_data_test:/data
-    ports:
-      - 6379:6379
+    expose:
+      - 6379
     logging:
       driver: none
   auth:
@@ -36,8 +36,8 @@ services:
       - ../../.auth.env
     entrypoint:
       - entrypoint.sh
-    ports:
-      - 8000:8000
+    expose:
+      - 8000
     depends_on:
       - redis
       - db
