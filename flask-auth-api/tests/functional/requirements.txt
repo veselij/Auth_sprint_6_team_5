@@ -1,5 +1,5 @@
 aiohttp
-pytest-asyncio
+pytest - asyncio
 pytest
 multidict
 aioredis

@@ -1,11 +1,12 @@
-import aiohttp
 import asyncio
-import jwt
 from dataclasses import dataclass
-from multidict import CIMultiDictProxy
+from typing import Optional
+
+import aiohttp
+import jwt
 import pytest
 import pytest_asyncio
-from typing import Optional
+from multidict import CIMultiDictProxy
 
 
 @dataclass
@@ -43,7 +44,9 @@ def make_get_request(web_client):
 
 @pytest.fixture
 def make_post_request(web_client):
-    async def inner(url: str, params: Optional[dict] = None, headers: Optional[dict] = None, data: Optional[dict] = None) -> HTTPResponse:
+    async def inner(
+        url: str, params: Optional[dict] = None, headers: Optional[dict] = None, data: Optional[dict] = None
+    ) -> HTTPResponse:
         params = params or {}
         async with web_client.post(url, params=params, headers=headers, json=data) as response:
             return HTTPResponse(
@@ -57,7 +60,9 @@ def make_post_request(web_client):
 
 @pytest.fixture
 def make_put_request(web_client):
-    async def inner(url: str, params: Optional[dict] = None, headers: Optional[dict] = None, data: Optional[dict] = None) -> HTTPResponse:
+    async def inner(
+        url: str, params: Optional[dict] = None, headers: Optional[dict] = None, data: Optional[dict] = None
+    ) -> HTTPResponse:
         params = params or {}
         async with web_client.put(url, params=params, headers=headers, json=data) as response:
             return HTTPResponse(
@@ -71,9 +76,11 @@ def make_put_request(web_client):
 
 @pytest.fixture
 def make_delete_request(web_client):
-    async def inner(url: str, params: Optional[dict] = None, headers: Optional[dict] = None, data: Optional[dict] = None) -> HTTPResponse:
+    async def inner(
+        url: str, params: Optional[dict] = None, headers: Optional[dict] = None, data: Optional[dict] = None
+    ) -> HTTPResponse:
         params = params or {}
-        async with web_client.delete(url, params=params, headers=headers) as response:
+        async with web_client.delete(url, params=params, headers=headers, json=data) as response:
             return HTTPResponse(
                 body=await response.json(),
                 headers=response.headers,
@@ -86,17 +93,18 @@ def make_delete_request(web_client):
 @pytest.fixture
 def prepare_user(make_post_request):
     async def inner(url: str, user_data: dict):
-        await make_post_request(url=f'{url}/register', data=user_data)
+        await make_post_request(url=f"{url}/register", data=user_data)
 
-        response = await make_post_request(url=f'{url}/login', data=user_data)
-        
+        response = await make_post_request(url=f"{url}/login", data=user_data)
+
         refresh_token = response.body["refresh_token"]
         headers_refresh = {"Authorization": f"Bearer {refresh_token}"}
 
         access_token = response.body["access_token"]
         headers_access = {"Authorization": f"Bearer {access_token}"}
-        
-        uuid = jwt.decode(refresh_token, options={"verify_signature": False})['sub']
+
+        uuid = jwt.decode(refresh_token, options={"verify_signature": False})["sub"]
 
         return headers_access, headers_refresh, uuid
+
     return inner

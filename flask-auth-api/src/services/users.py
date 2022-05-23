@@ -16,6 +16,7 @@ from db.cache import Caches
 from models.db_models import Role, User, UserAccessHistory
 from repository.repository import Repositiry
 from utils.password_hashing import get_password_hash
+from utils.view_decorators import check_revoked_token
 
 
 class UserService:
@@ -102,12 +103,17 @@ class UserService:
         return []
 
     def add_user_roles(self, user_id: str, role_ids: list) -> bool:
+        self.revoke_access_token({}, user_id, 'true')
         return self.repository.add_many_to_many_row(User, user_id, Role, role_ids, "roles")
 
     def remove_user_roles(self, user_id: str, role_ids: list) -> bool:
+        self.revoke_access_token({}, user_id, 'true')
         return self.repository.remove_many_to_many_row(User, user_id, Role, role_ids, "roles")
 
     def check_user_roles(self, access_token: str) -> Optional[list]:
         token = decode_token(access_token)
         if token:
+            if check_revoked_token(token):
+                return None
             return token["roles"]
+        return None

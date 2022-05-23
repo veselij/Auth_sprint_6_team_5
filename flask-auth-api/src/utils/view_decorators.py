@@ -4,7 +4,7 @@ from functools import wraps
 from http import HTTPStatus
 
 from flask import jsonify, request
-from flask_jwt_extended import get_jwt, get_jwt_identity, verify_jwt_in_request
+from flask_jwt_extended import get_jwt, verify_jwt_in_request
 
 from core.config import config
 from core.msg import Msg
@@ -35,14 +35,14 @@ def jwt_verification(superuser_only=False):
     return wrapper
 
 
-def check_revoked_token(user_id: str, token: dict) -> bool:
+def check_revoked_token(token: dict) -> bool:
     if "related_access_token" in token:
         access_token = token["related_access_token"]
         exp = token["exp"] - config.refresh_ttl
     else:
         access_token = token["jti"]
         exp = token["exp"] - config.access_ttl
-    revoked_tokens = caches.access_cache.get_value(user_id)
+    revoked_tokens = caches.access_cache.get_value(token['sub'])
     if not revoked_tokens:
         return False
     revoked_tokens = json.loads(revoked_tokens)
@@ -59,8 +59,7 @@ def revoked_token_check():
         @wraps(fn)
         def decorator(*args, **kwargs):
             token = get_jwt()
-            user = get_jwt_identity()
-            if check_revoked_token(user, token):
+            if check_revoked_token(token):
                 return jsonify(MsgSchema().dump(Msg.not_found.value)), HTTPStatus.UNAUTHORIZED.value
             return fn(*args, **kwargs)
 
