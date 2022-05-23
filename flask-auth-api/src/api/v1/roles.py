@@ -5,7 +5,6 @@ from flask.blueprints import Blueprint
 from flask.helpers import make_response
 from flask.json import jsonify
 from flask.wrappers import Response
-from flask_jwt_extended.utils import get_jwt
 
 from api.v1.common_view import CustomSwaggerView
 from containers.container import Container
@@ -15,7 +14,6 @@ from models.users_response_schemas import (
     MsgSchema,
     RoleSchema,
     RoleUUIDSchema,
-    TokenSchema,
     UserRoleSchema,
     UserUUIDSchema,
 )

@@ -29,8 +29,8 @@ services:
       - backend_nw
     volumes:
       - redis_data:/data
-    ports:
-      - 6379:6379
+    expose:
+      - 6379
   auth:
     container_name: auth
     build:
@@ -44,8 +44,8 @@ services:
       - .auth.env
     entrypoint: 
       - entrypoint.sh
-    ports:
-      - 8000:8000
+    expose:
+      - 8000
     depends_on:
       - db
       - redis
