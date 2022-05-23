@@ -1,19 +1,15 @@
-from contextlib import contextmanager, AbstractContextManager
-from typing import Callable
+from contextlib import contextmanager
 
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import scoped_session, sessionmaker, Session
+from sqlalchemy.orm import Session, scoped_session, sessionmaker
 
 from core.config import config
 
-
 Base = declarative_base()
-#Base.query = db_session.query_property()
 
 
 class Database:
-
     def __init__(self) -> None:
         self.engine = create_engine(
             "postgresql://{username}:{password}@{host}/{database}".format(
@@ -27,7 +23,6 @@ class Database:
             max_overflow=20,
         )
         self.db_session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=self.engine))
-        
 
     @contextmanager
     def session_manager(self):

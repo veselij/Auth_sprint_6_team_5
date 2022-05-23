@@ -1,13 +1,13 @@
 from http import HTTPStatus
 from uuid import UUID
 
+from dependency_injector.wiring import Provide, inject
 from flask import Blueprint, jsonify, make_response
 from flask.wrappers import Response
 from flask_jwt_extended import get_jwt
-from dependency_injector.wiring import inject, Provide
 
 from api.v1.common_view import CustomSwaggerView
-from utils.view_decorators import jwt_verification, revoked_token_check
+from containers.container import Container
 from core.msg import Msg
 from models.users_response_schemas import (
     AllDevicesSchema,
@@ -20,7 +20,7 @@ from models.users_response_schemas import (
     UserUUIDSchema,
 )
 from services.users import UserService
-from containers.container import Container
+from utils.view_decorators import jwt_verification, revoked_token_check
 
 bp = Blueprint("users", __name__, url_prefix="/api/v1/users")
 
@@ -45,6 +45,7 @@ class RegistrationView(CustomSwaggerView):
             "content": {"application/json": {"schema": MsgSchema, "example": Msg.alredy_exists.value}},
         },
     }
+
     @inject
     def post(self, user_service: UserService = Provide[Container.user_service]) -> Response:
         self.validate_body(AuthSchema)
@@ -80,11 +81,13 @@ class LoginView(CustomSwaggerView):
     def post(self, user_service: UserService = Provide[Container.user_service]) -> Response:
         self.validate_body(AuthSchema)
 
-        print((user_service))
         user = user_service.autorize_user(self.validated_body["login"], self.validated_body["password"])
         if not user:
             return make_response(jsonify(MsgSchema().load(Msg.unauthorized.value)), HTTPStatus.UNAUTHORIZED.value)
-        return make_response(jsonify(TokenSchema().load(user_service.generate_tokens(str(user.id), user.is_superuser))), HTTPStatus.OK.value)
+        return make_response(
+            jsonify(TokenSchema().load(user_service.generate_tokens(str(user.id), user.is_superuser))),
+            HTTPStatus.OK.value,
+        )
 
 
 class RefreshView(CustomSwaggerView):
@@ -114,7 +117,9 @@ class RefreshView(CustomSwaggerView):
         token = get_jwt()
         if not user_service.check_refresh_token(token, user):
             return make_response(jsonify(MsgSchema().load(Msg.unauthorized.value)), HTTPStatus.UNAUTHORIZED.value)
-        return make_response(jsonify(TokenSchema().load(user_service.generate_tokens(user, token['admin']))), HTTPStatus.OK.value)
+        return make_response(
+            jsonify(TokenSchema().load(user_service.generate_tokens(user, token["admin"]))), HTTPStatus.OK.value,
+        )
 
 
 class LogoutView(CustomSwaggerView):

@@ -1,16 +1,15 @@
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
+from sqlalchemy import engine_from_config, pool
 
 from alembic import context
-
-from models import db_models
 from core.config import config as c
+from models import db_models
+
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
-config.set_main_option('sqlalchemy.url', f'postgresql://{c.pg_user}:{c.pg_password}@{c.pg_host}/{c.pg_database}')
+config.set_main_option("sqlalchemy.url", f"postgresql://{c.pg_user}:{c.pg_password}@{c.pg_host}/{c.pg_database}")
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -67,9 +66,7 @@ def run_migrations_online():
     )
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection, target_metadata=target_metadata
-        )
+        context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
             context.run_migrations()

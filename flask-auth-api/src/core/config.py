@@ -3,7 +3,10 @@ from typing import Optional
 
 from pydantic import BaseSettings, Field
 
-SWAGGER_TEMPLATE = {"components": {"securitySchemes": {"bearerAuth": {"type": "apiKey", "name": "Authorization", "in": "header"}}}, "security": {"bearerAuth": []}}
+SWAGGER_TEMPLATE = {
+    "components": {"securitySchemes": {"bearerAuth": {"type": "apiKey", "name": "Authorization", "in": "header"}}},
+    "security": {"bearerAuth": []},
+}
 
 
 class ConfigSettings(BaseSettings):

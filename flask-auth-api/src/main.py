@@ -4,11 +4,11 @@ from flasgger import Swagger
 from flask import Flask
 from flask_jwt_extended import JWTManager
 
-import api.v1.users as users_api
 import api.v1.roles as roles_api
+import api.v1.users as users_api
 from commands.superuser import superuser_cli
-from core.config import config, SWAGGER_TEMPLATE
 from containers.container import Container
+from core.config import SWAGGER_TEMPLATE, config
 
 
 def create_app() -> Flask:
@@ -20,7 +20,6 @@ def create_app() -> Flask:
     app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(seconds=config.access_ttl)
     app.config["JWT_REFRESH_TOKEN_EXPIRES"] = timedelta(seconds=config.refresh_ttl)
     jwt = JWTManager(app)
-
 
     app.cli.add_command(superuser_cli)
 

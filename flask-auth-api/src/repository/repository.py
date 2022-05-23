@@ -1,18 +1,17 @@
 from contextlib import AbstractContextManager
-from typing import Optional, Callable
+from typing import Callable, Optional
 
-from sqlalchemy.exc import OperationalError, IntegrityError
-
-from core.config import logger
-from utils.decorators import backoff
-from utils.exceptions import RetryExceptionError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import InstrumentedAttribute
+
+from core.config import logger
 from db.db import Base
+from utils.decorators import backoff
+from utils.exceptions import RetryExceptionError
 
 
 class Repositiry:
-
     def __init__(self, session_factory: Callable[..., AbstractContextManager[Session]]) -> None:
         self.session_factory = session_factory
 
@@ -27,9 +26,8 @@ class Repositiry:
                 return False
             except OperationalError:
                 session.rollback()
-                raise RetryExceptionError('Database not available')
+                raise RetryExceptionError("Database not available")
         return True
-
 
     @backoff(logger, start_sleep_time=0.1, factor=2, border_sleep_time=10)
     def update_obj_in_db(self, obj: type[Base], fileds_to_update: dict, **kwargs) -> bool:
@@ -42,9 +40,8 @@ class Repositiry:
                 return False
             except OperationalError:
                 session.rollback()
-                raise RetryExceptionError('Database not available')
+                raise RetryExceptionError("Database not available")
         return True
-
 
     @backoff(logger, start_sleep_time=0.1, factor=2, border_sleep_time=10)
     def get_object_by_field(self, obj: type[Base], **kwargs) -> Optional[Base]:
@@ -52,9 +49,9 @@ class Repositiry:
             try:
                 obj_instance = session.query(obj).filter_by(**kwargs).one_or_none()
             except OperationalError:
-                raise RetryExceptionError('Database not available')
+                raise RetryExceptionError("Database not available")
         return obj_instance
-    
+
     @backoff(logger, start_sleep_time=0.1, factor=2, border_sleep_time=10)
     def get_objects_by_field(self, obj: type[Base], **kwargs) -> Optional[Base]:
         with self.session_factory() as session:
@@ -64,7 +61,7 @@ class Repositiry:
                 else:
                     obj_instance = session.query(obj).all()
             except OperationalError:
-                raise RetryExceptionError('Database not available')
+                raise RetryExceptionError("Database not available")
         return obj_instance
 
     @backoff(logger, start_sleep_time=0.1, factor=2, border_sleep_time=10)
@@ -73,9 +70,10 @@ class Repositiry:
             try:
                 objs = session.query(obj).join(joined_obj)
             except OperationalError:
-                raise RetryExceptionError('Database not available')
+                raise RetryExceptionError("Database not available")
         return objs
 
+    @backoff(logger, start_sleep_time=0.1, factor=2, border_sleep_time=10)
     def delete_object_by_field(self, obj: type[Base], **kwargs) -> bool:
         with self.session_factory() as session:
             try:
@@ -86,5 +84,51 @@ class Repositiry:
                 session.commit()
             except OperationalError:
                 session.rollback()
-                raise RetryExceptionError('Database not available')
+                raise RetryExceptionError("Database not available")
+            return True
+
+    @backoff(logger, start_sleep_time=0.1, factor=2, border_sleep_time=10)
+    def add_many_to_many_row(
+        self, main_obj: type[Base], main_id: str, related_obj: type[Base], related_values: list, update_field: str,
+    ) -> bool:
+        with self.session_factory() as session:
+            try:
+                m_obj = session.query(main_obj).filter_by(id=main_id).one_or_none()
+                if not m_obj:
+                    session.rollback()
+                    return False
+                for related_value in related_values:
+                    r_obj = session.query(related_obj).filter_by(id=related_value).one_or_none()
+                    if not r_obj:
+                        session.rollback()
+                        return False
+                    getattr(m_obj, update_field).append(r_obj)
+                session.add(m_obj)
+                session.commit()
+            except OperationalError:
+                session.rollback()
+                raise RetryExceptionError("Database not available")
+            return True
+
+    @backoff(logger, start_sleep_time=0.1, factor=2, border_sleep_time=10)
+    def remove_many_to_many_row(
+        self, main_obj: type[Base], main_id: str, related_obj: type[Base], related_values: list, update_field: str,
+    ) -> bool:
+        with self.session_factory() as session:
+            try:
+                m_obj = session.query(main_obj).filter_by(id=main_id).one_or_none()
+                if not m_obj:
+                    session.rollback()
+                    return False
+                for related_value in related_values:
+                    r_obj = session.query(related_obj).filter_by(id=related_value).one_or_none()
+                    if not r_obj:
+                        session.rollback()
+                        return False
+                    getattr(m_obj, update_field).remove(r_obj)
+                session.add(m_obj)
+                session.commit()
+            except OperationalError:
+                session.rollback()
+                raise RetryExceptionError("Database not available")
             return True
