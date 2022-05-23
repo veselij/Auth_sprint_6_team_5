@@ -26,4 +26,8 @@ sequenceDiagram
 	"description": ""
 }
 ```
-**Response Body**:  None
+**Response Body**: 
+```
+{
+"Msg": "Success"
+}

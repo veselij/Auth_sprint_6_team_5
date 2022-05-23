@@ -30,5 +30,3 @@ sequenceDiagram
 	"refresh_token": "refresh_token"
 }  
 ```
-Token time to live 1 day
-Token refresh time to live 10 days

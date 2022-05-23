@@ -22,8 +22,13 @@ sequenceDiagram
 	"password": ""
 }  
 ```
-
-## Can be implemted in future
+**Response Body**
+```
+{
+"Msg": "Success"
+}
+```
+## Can be implemted in future - not done
 **for storing data in BD we will use ciphering**
 1. generate random key1
 2. generate key2 from user password with PBKDF2

@@ -24,8 +24,8 @@ sequenceDiagram
 [
 	{
 		"id": "",
-		"role_name": "",
-		"role_description": ""
+		"role": "",
+		"description": ""
 	}
 ] 
 ```

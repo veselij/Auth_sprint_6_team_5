@@ -15,5 +15,10 @@ sequenceDiagram
 **Path**: /users/logout/{user_id}?all_devices=false
 **Type**: Get  
 **Header**: Authorization: Bearer {token}  
-**Body**: None  
+**Body**:
+```
+{
+"Msg": "Success"
+}
+```
 **Response Body**: None  

@@ -5,7 +5,7 @@ sequenceDiagram
     participant R as Redis
 
 	Note over C, S: Add new role
-	C->>S: https://x.x.x.x/roles/add
+	C->>S: https://x.x.x.x/roles
 	S->>S: check uuid from jwt is super user and token valid
 	S-->>C: 401 Unauthorized
 	S->>S: create new role
@@ -14,15 +14,20 @@ sequenceDiagram
 
 ```
 
-**Path**: /roles/add
+**Path**: /roles
 
 **Type**: POST 
 **Header**: Authorization: Bearer {token}  
 **Body**:  
 ```
-{
-	"role_name": "",
-	"role_description": ""
+[{
+"role": "role1",
+"description": "desc"
 }
+]
 ```
-**Response Body**:  None
+**Response Body**:  
+```
+{
+"Msg": "Success"
+}
