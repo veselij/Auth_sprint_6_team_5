@@ -1,15 +1,14 @@
 from dependency_injector import containers, providers
-from db.db import Database
+
 from db.cache import Caches
+from db.db import Database
 from repository.repository import Repositiry
-from services.users import UserService
 from services.roles import RoleService
-
-
+from services.users import UserService
 
 
 class Container(containers.DeclarativeContainer):
-   
+
     wiring_config = containers.WiringConfiguration(modules=["api.v1.users", "api.v1.roles"])
     db = providers.Singleton(Database)
 

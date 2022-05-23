@@ -1,17 +1,15 @@
-from functools import wraps
 import json
-
 import os
+from functools import wraps
 from http import HTTPStatus
 
 from flask import jsonify, request
 from flask_jwt_extended import get_jwt, get_jwt_identity, verify_jwt_in_request
 
-from core.msg import Msg
 from core.config import config
-from models.users_response_schemas import MsgSchema
+from core.msg import Msg
 from db.cache import Caches
-
+from models.users_response_schemas import MsgSchema
 
 caches = Caches()
 
@@ -22,11 +20,11 @@ def jwt_verification(superuser_only=False):
         def decorator(*args, **kwargs):
             verify_jwt_in_request()
             token = get_jwt()
-            jwt_uuid = token['sub']
+            jwt_uuid = token["sub"]
             request_uuid = os.path.basename(request.path)
             if not superuser_only and jwt_uuid == request_uuid:
                 return fn(*args, **kwargs)
-            admin = token.get('admin', None)
+            admin = token.get("admin", None)
             if admin == 1:
                 return fn(*args, **kwargs)
             else:

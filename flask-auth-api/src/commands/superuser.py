@@ -7,14 +7,15 @@ from flask.cli import AppGroup
 from core.config import config
 from db.db import Database
 from models.db_models import User
-from utils.password_hashing import get_password_hash
 from repository.repository import Repositiry
+from utils.password_hashing import get_password_hash
 
 superuser_cli = AppGroup("superuser")
 
 
 db = Database()
 repository = Repositiry(db.session_manager)
+
 
 class InvalidUserDataError(Exception):
     def __init__(self, message) -> None:
