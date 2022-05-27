@@ -9,16 +9,18 @@ import api.v1.users as users_api
 from commands.superuser import superuser_cli
 from containers.container import Container
 from core.config import SWAGGER_TEMPLATE, config
+from social.oauth import oauth, testing_oauth
 
 
 def create_app() -> Flask:
     container = Container()
     app = Flask(__name__)
+    app.secret_key = config.secret
     app.container = container
-
     app.config["JWT_SECRET_KEY"] = config.secret
     app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(seconds=config.access_ttl)
     app.config["JWT_REFRESH_TOKEN_EXPIRES"] = timedelta(seconds=config.refresh_ttl)
+    app.config["TESTING"] = config.test
     jwt = JWTManager(app)
 
     app.cli.add_command(superuser_cli)
@@ -34,4 +36,9 @@ def create_app() -> Flask:
 
 if __name__ == "__main__":
     app = create_app()
+    if app.config["TESTING"]:
+        testing_oauth.init_app(app)
+    else:
+        oauth.init_app(app)
+
     app.run(debug=True, threaded=False, port=8000)

@@ -42,7 +42,7 @@ def check_revoked_token(token: dict) -> bool:
     else:
         access_token = token["jti"]
         exp = token["exp"] - config.access_ttl
-    revoked_tokens = caches.access_cache.get_value(token['sub'])
+    revoked_tokens = caches.access_cache.get_value(token["sub"])
     if not revoked_tokens:
         return False
     revoked_tokens = json.loads(revoked_tokens)

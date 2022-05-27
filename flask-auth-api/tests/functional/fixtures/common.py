@@ -43,6 +43,20 @@ def make_get_request(web_client):
 
 
 @pytest.fixture
+def make_get_request_no_body(web_client):
+    async def inner(url: str, params: Optional[dict] = None, headers: Optional[dict] = None) -> HTTPResponse:
+        params = params or {}
+        async with web_client.get(url, params=params, headers=headers) as response:
+            return HTTPResponse(
+                body={},
+                headers=response.headers,
+                status=response.status,
+            )
+
+    return inner
+
+
+@pytest.fixture
 def make_post_request(web_client):
     async def inner(
         url: str, params: Optional[dict] = None, headers: Optional[dict] = None, data: Optional[dict] = None

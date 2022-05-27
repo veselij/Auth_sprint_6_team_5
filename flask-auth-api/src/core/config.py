@@ -10,6 +10,8 @@ SWAGGER_TEMPLATE = {
 
 
 class ConfigSettings(BaseSettings):
+    test: bool = Field(True, env="FLASK_TESTING")
+
     logs: str = Field("error.log", env="LOGS_PATH")
 
     redis_host: str = Field("127.0.0.1", env="REDIS_HOST")
