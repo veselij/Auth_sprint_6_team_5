@@ -2,9 +2,10 @@ from http import HTTPStatus
 from uuid import UUID
 
 from dependency_injector.wiring import Provide, inject
-from flask import Blueprint, jsonify, make_response
+from flask import Blueprint, abort, jsonify, make_response, url_for
+from flask.views import MethodView
 from flask.wrappers import Response
-from flask_jwt_extended import get_jwt
+from flask_jwt_extended import get_jwt, jwt_required
 
 from api.v1.common_view import CustomSwaggerView
 from containers.container import Container
@@ -15,11 +16,16 @@ from models.users_response_schemas import (
     DefaultPaginator,
     MsgSchema,
     PaginationSchema,
+    ProvidersSchema,
+    SocialTokenSchema,
     TokenSchema,
     UserHistorySchema,
     UserUUIDSchema,
 )
 from services.users import UserService
+from social.oauth import testing_oauth as oauth
+from social.providers import Providers
+from social.userdata import user_data_registry
 from utils.view_decorators import jwt_verification, revoked_token_check
 
 bp = Blueprint("users", __name__, url_prefix="/api/v1/users")
@@ -85,7 +91,7 @@ class LoginView(CustomSwaggerView):
         if not user:
             return make_response(jsonify(MsgSchema().load(Msg.unauthorized.value)), HTTPStatus.UNAUTHORIZED.value)
         return make_response(
-            jsonify(TokenSchema().load(user_service.generate_tokens(str(user.id), user.is_superuser))),
+            jsonify(TokenSchema().dump(user_service.generate_tokens(str(user.id), user.is_superuser))),
             HTTPStatus.OK.value,
         )
 
@@ -118,7 +124,8 @@ class RefreshView(CustomSwaggerView):
         if not user_service.check_refresh_token(token, user):
             return make_response(jsonify(MsgSchema().load(Msg.unauthorized.value)), HTTPStatus.UNAUTHORIZED.value)
         return make_response(
-            jsonify(TokenSchema().load(user_service.generate_tokens(user, token["admin"]))), HTTPStatus.OK.value,
+            jsonify(TokenSchema().dump(user_service.generate_tokens(user, token["admin"]))),
+            HTTPStatus.OK.value,
         )
 
 
@@ -256,8 +263,113 @@ class UserHistoryView(CustomSwaggerView):
         return make_response(jsonify(UserHistorySchema(many=True).dump(user_history)), HTTPStatus.OK.value)
 
 
+class SocialLoginView(CustomSwaggerView):
+
+    tags = ["users"]
+
+    parameters = [
+        {
+            "in": "path",
+            "name": "provider",
+            "schema": {"type": "string", "enum": [field.name for field in Providers]},
+            "required": True,
+        },
+    ]
+    responses = {
+        HTTPStatus.OK.value: {
+            "description": HTTPStatus.OK.phrase,
+            "content": {"application/json": {"schema": SocialTokenSchema}},
+        },
+        HTTPStatus.NOT_FOUND.value: {
+            "description": HTTPStatus.NOT_FOUND.phrase,
+            "content": {"application/json": {"schema": MsgSchema, "example": Msg.not_found.value}},
+        },
+    }
+
+    @inject
+    def get(self, provider: str, user_service: UserService = Provide[Container.user_service]) -> Response:
+        self.validate_path(ProvidersSchema)
+        client = oauth.create_client(provider)
+
+        if not client:
+            return make_response(jsonify(MsgSchema().load(Msg.not_found.value)), HTTPStatus.NOT_FOUND.value)
+
+        token = client.authorize_access_token()
+        user_data = user_data_registry[provider](token, client)
+
+        user_token = user_service.login_via_social_provider(user_data)
+        if not user_token:
+            return make_response(jsonify(MsgSchema().load(Msg.not_found.value)), HTTPStatus.NOT_FOUND.value)
+
+        return make_response(
+            jsonify(SocialTokenSchema().dump(user_token)),
+            HTTPStatus.OK.value,
+        )
+
+
+class SocialRegisterView(MethodView):
+    def get(self, provider: str) -> None:
+        client = oauth.create_client(provider)
+        if not client:
+            abort(404)
+
+        redirect_uri = url_for("users.social", provider=provider, _external=True)
+        return client.authorize_redirect(redirect_uri)
+
+
+class DeleteSocialAccountView(CustomSwaggerView):
+    decorators = [revoked_token_check(), jwt_required()]
+
+    tags = ["users"]
+
+    parameters = [
+        {
+            "in": "path",
+            "name": "provider",
+            "schema": {"type": "string", "enum": [field.name for field in Providers]},
+            "required": True,
+        },
+    ]
+    responses = {
+        HTTPStatus.OK.value: {
+            "description": HTTPStatus.OK.phrase,
+            "content": {"application/json": {"schema": MsgSchema, "example": Msg.ok.value}},
+        },
+        HTTPStatus.NOT_FOUND.value: {
+            "description": HTTPStatus.NOT_FOUND.phrase,
+            "content": {"application/json": {"schema": MsgSchema, "example": Msg.not_found.value}},
+        },
+        HTTPStatus.UNAUTHORIZED.value: {
+            "description": HTTPStatus.UNAUTHORIZED.phrase,
+            "content": {"application/json": {"schema": MsgSchema, "example": Msg.unauthorized.value}},
+        },
+    }
+
+    @inject
+    def delete(self, provider: str, user_service: UserService = Provide[Container.user_service]) -> Response:
+        self.validate_path(ProvidersSchema)
+
+        token = get_jwt()
+        deleted = user_service.delete_social_account(token, provider)
+
+        if not deleted:
+            return make_response(jsonify(MsgSchema().load(Msg.not_found.value)), HTTPStatus.NOT_FOUND.value)
+
+        return make_response(
+            jsonify(MsgSchema().load(Msg.ok.value)),
+            HTTPStatus.OK.value,
+        )
+
+
 bp.add_url_rule("/<uuid:user_id>", view_func=ChangeUserView.as_view("change_user"), methods=["PUT"])
 bp.add_url_rule("/register", view_func=RegistrationView.as_view("register"), methods=["POST"])
+bp.add_url_rule(
+    "/social/delete/<string:provider>", view_func=DeleteSocialAccountView.as_view("social_delete"), methods=["DELETE"]
+)
+bp.add_url_rule("/social/login/<string:provider>", view_func=SocialLoginView.as_view("social"), methods=["GET"])
+bp.add_url_rule(
+    "/social/register/<string:provider>", view_func=SocialRegisterView.as_view("social_register"), methods=["GET"]
+)
 bp.add_url_rule("/login", view_func=LoginView.as_view("login"), methods=["POST"])
 bp.add_url_rule("/refresh/<uuid:user_id>", view_func=RefreshView.as_view("refresh"), methods=["GET"])
 bp.add_url_rule("/logout/<uuid:user_id>", view_func=LogoutView.as_view("logout"), methods=["GET"])

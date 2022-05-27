@@ -173,3 +173,66 @@ async def test_normal_user_change_normal_user(
     # normal user change other normal user
     response = await make_put_request(url=f"{url}/{uuid_normal}", headers=headers_access_normal2, data=update_user_data)
     assert response.status == HTTPStatus.UNAUTHORIZED
+
+
+@pytest.mark.asyncio
+async def test_register_social(make_get_request_no_body, clear_db_tables, clear_redis):
+
+    # register yandex user
+    response = await make_get_request_no_body(url=f"{url}/social/register/yandex")
+
+    assert response.status == HTTPStatus.OK
+
+
+@pytest.mark.asyncio
+async def test_login_social_new_user(make_get_request, clear_db_tables, clear_redis, get_from_redis):
+
+    # register yandex user
+    response = await make_get_request(url=f"{url}/social/login/yandex")
+
+    assert response.status == HTTPStatus.OK
+    assert await check_tokens(response, get_from_redis)
+
+
+@pytest.mark.asyncio
+async def test_login_social_existing_user(make_get_request, clear_db_tables, clear_redis, get_from_redis):
+
+    # register yandex user
+    response = await make_get_request(url=f"{url}/social/login/yandex")
+
+    assert response.status == HTTPStatus.OK
+    assert await check_tokens(response, get_from_redis)
+
+    # login after user created
+    response = await make_get_request(url=f"{url}/social/login/yandex")
+
+    assert response.status == HTTPStatus.OK
+    assert await check_tokens(response, get_from_redis)
+
+
+@pytest.mark.asyncio
+async def test_delete_social_user_without_token(make_get_request, make_delete_request, clear_db_tables, clear_redis):
+
+    # register yandex user
+    response = await make_get_request(url=f"{url}/social/login/yandex")
+    assert response.status == HTTPStatus.OK
+
+    # delete yandex user
+    response = await make_delete_request(url=f"{url}/social/delete/yandex")
+    assert response.status == HTTPStatus.UNAUTHORIZED
+
+
+@pytest.mark.asyncio
+async def test_delete_social_user_with_token(make_get_request, make_delete_request, clear_db_tables, clear_redis):
+
+    # register yandex user
+    response = await make_get_request(url=f"{url}/social/login/yandex")
+    assert response.status == HTTPStatus.OK
+
+    # prepare access token
+    access_token = response.body["access_token"]
+    headers_access = {"Authorization": f"Bearer {access_token}"}
+
+    # delete yandex user
+    response = await make_delete_request(url=f"{url}/social/delete/yandex", headers=headers_access)
+    assert response.status == HTTPStatus.OK

@@ -3,6 +3,8 @@ from enum import Enum
 from flasgger import Schema, fields
 from marshmallow.validate import OneOf, Range
 
+from social.providers import Providers
+
 
 class DefaultPaginator(Enum):
     page_num = 1
@@ -25,6 +27,10 @@ class MsgSchema(Schema):
 class TokenSchema(Schema):
     access_token = fields.Str(required=True)
     refresh_token = fields.Str(required=True)
+
+
+class SocialTokenSchema(TokenSchema):
+    required_fields = fields.List(fields.Str())
 
 
 class AllDevicesSchema(Schema):
@@ -66,3 +72,7 @@ class UserRoleSchema(Schema):
 
 class CheckAccessTokenSchema(Schema):
     access_token = fields.Str(required=True)
+
+
+class ProvidersSchema(Schema):
+    provider = fields.Str(required=True, validate=OneOf([field.name for field in Providers]))

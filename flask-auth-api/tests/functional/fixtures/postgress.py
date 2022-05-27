@@ -16,7 +16,7 @@ def clear_db_tables():
         cursor_factory=DictCursor,
     )
     cur = connect.cursor()
-    cur.execute("DELETE from users_access_history;delete from user_roles;delete from roles; delete from users; ")
+    cur.execute("DELETE from users_access_history;delete from user_roles;delete from roles;DELETE from social_account; delete from users")
     cur.close()
     connect.commit()
     connect.close()

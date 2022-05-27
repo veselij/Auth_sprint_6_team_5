@@ -89,7 +89,12 @@ class Repositiry:
 
     @backoff(logger, start_sleep_time=0.1, factor=2, border_sleep_time=10)
     def add_many_to_many_row(
-        self, main_obj: type[Base], main_id: str, related_obj: type[Base], related_values: list, update_field: str,
+        self,
+        main_obj: type[Base],
+        main_id: str,
+        related_obj: type[Base],
+        related_values: list,
+        update_field: str,
     ) -> bool:
         with self.session_factory() as session:
             try:
@@ -112,7 +117,12 @@ class Repositiry:
 
     @backoff(logger, start_sleep_time=0.1, factor=2, border_sleep_time=10)
     def remove_many_to_many_row(
-        self, main_obj: type[Base], main_id: str, related_obj: type[Base], related_values: list, update_field: str,
+        self,
+        main_obj: type[Base],
+        main_id: str,
+        related_obj: type[Base],
+        related_values: list,
+        update_field: str,
     ) -> bool:
         with self.session_factory() as session:
             try:
@@ -132,3 +142,8 @@ class Repositiry:
                 session.rollback()
                 raise RetryExceptionError("Database not available")
             return True
+
+    @backoff(logger, start_sleep_time=0.1, factor=2, border_sleep_time=10)
+    def refresh_object(self, obj: Base) -> Base:
+        with self.session_factory() as session:
+            return session.refresh(obj)

@@ -1,9 +1,11 @@
 import uuid
+from typing import Optional
 
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String, Table
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import backref, relationship
 from sqlalchemy.sql import func
+from sqlalchemy.sql.schema import UniqueConstraint
 
 from db.db import Base
 from utils.password_hashing import verify_password
@@ -23,12 +25,14 @@ class User(Base):
     login = Column(String, unique=True, nullable=False)
     password = Column(String, nullable=False)
     is_superuser = Column(Boolean, default=False, nullable=False)
+    email = Column(String, nullable=True)
     roles = relationship("Role", secondary=user_role_association_table, back_populates="users")
 
-    def __init__(self, login: str, password: str, is_superuser: bool = False) -> None:
+    def __init__(self, login: str, password: str, email: Optional[str] = None, is_superuser: bool = False) -> None:
         self.login = login
         self.password = password
         self.is_superuser = is_superuser
+        self.email = email
 
     def __repr__(self) -> str:
         return "User {0}".format(self.login)
@@ -61,11 +65,34 @@ class UserAccessHistory(Base):
     user_agent = Column(String, nullable=True)
     login_date = Column(DateTime(timezone=True), server_default=func.now())
     login_status = Column(Boolean, nullable=False)
+    service_name = Column(String, nullable=True)
 
-    def __init__(self, user_id, user_agent, login_status) -> None:
+    def __init__(self, user_id: UUID, user_agent: str, login_status: bool, service_name: Optional[str] = None) -> None:
         self.user_id = user_id
         self.user_agent = user_agent
         self.login_status = login_status
+        self.service_name = service_name
 
     def __repr__(self) -> str:
         return "User {0} access {1} with status {2}".format(self.user_id, self.login_date, self.login_status)
+
+
+class SocialAccount(Base):
+    __tablename__ = "social_account"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    user = relationship("User", backref=backref("social_accounts", lazy=True))
+
+    social_id = Column(String, nullable=False)
+    social_name = Column(String, nullable=False)
+
+    __table_args__ = (UniqueConstraint("social_id", "social_name", name="social_pk"),)
+
+    def __init__(self, user_id: UUID, social_id: str, social_name: str) -> None:
+        self.user_id = user_id
+        self.social_id = social_id
+        self.social_name = social_name
+
+    def __repr__(self) -> str:
+        return f"<SocialAccount {self.social_name}:{self.user_id}>"
