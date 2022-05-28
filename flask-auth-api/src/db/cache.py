@@ -60,3 +60,7 @@ class Caches:
         Redis(connection_pool=ConnectionPool(host=config.redis_host, port=config.redis_port, db=1)),
         ConnectionError,
     )
+    request_cache: CacheManager = CacheManager(
+        Redis(connection_pool=ConnectionPool(host=config.redis_host, port=config.redis_port, db=2)),
+        ConnectionError,
+    )

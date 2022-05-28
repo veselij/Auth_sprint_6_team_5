@@ -10,6 +10,7 @@ SWAGGER_TEMPLATE = {
 
 
 class ConfigSettings(BaseSettings):
+    project_name: str = Field("Movies", env="PROJECT_NAME")
     test: bool = Field(True, env="FLASK_TESTING")
 
     logs: str = Field("error.log", env="LOGS_PATH")
@@ -33,6 +34,8 @@ class ConfigSettings(BaseSettings):
     api_name: str = Field("Auth API", env="API_NAME")
     uiversion: str = Field("3", env="UIVERSION")
     openapi: str = Field("3.0.2", env="OPENAPI")
+
+    request_ttl: int = Field(60, env="REQUEST_TTL")
 
 
 config = ConfigSettings()

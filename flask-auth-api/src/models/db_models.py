@@ -27,6 +27,9 @@ class User(Base):
     is_superuser = Column(Boolean, default=False, nullable=False)
     email = Column(String, nullable=True)
     roles = relationship("Role", secondary=user_role_association_table, back_populates="users")
+    totp_secret = Column(String, nullable=True)
+    totp_active = Column(Boolean, default=False, nullable=False)
+    totp_sync = Column(Boolean, default=False, nullable=False)
 
     def __init__(self, login: str, password: str, email: Optional[str] = None, is_superuser: bool = False) -> None:
         self.login = login
@@ -39,6 +42,16 @@ class User(Base):
 
     def check_password(self, password):
         return verify_password(password, self.password)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": str(self.id),
+            "login": self.login,
+            "is_superuser": self.is_superuser,
+            "totp_secret": self.totp_secret,
+            "totp_sync": self.totp_sync,
+            "totp_active": self.totp_active,
+        }
 
 
 class Role(Base):

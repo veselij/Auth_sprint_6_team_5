@@ -3,11 +3,13 @@ from http import HTTPStatus
 
 import jwt
 import pytest
+import pyotp
 
 from settings import config
 from testdata.users import update_user_data, user_data, user_login
 
 url = f"http://{config.api_ip}:{config.api_port}/api/v1/users"
+totp_url = f"http://{config.api_ip}:{config.api_port}/api/v1/totp"
 
 
 @dataclass
@@ -46,8 +48,6 @@ async def test_login(data, code, make_post_request, clear_db_tables, get_from_re
     response = await make_post_request(url=f"{url}/login", data=data)
 
     assert response.status == code
-    if code == HTTPStatus.OK:
-        assert await check_tokens(response, get_from_redis)
 
 
 @pytest.mark.asyncio
@@ -125,7 +125,6 @@ async def test_user_change(
     # check that login with new data - OK
     response = await make_post_request(url=f"{url}/login", data=update_user_data)
     assert response.status == HTTPStatus.OK
-    assert await check_tokens(response, get_from_redis)
 
 
 @pytest.mark.asyncio
@@ -159,7 +158,6 @@ async def test_superuser_change_normal_user(
     # check that updated user login with new data - OK
     response = await make_post_request(url=f"{url}/login", data=update_user_data)
     assert response.status == HTTPStatus.OK
-    assert await check_tokens(response, get_from_redis)
 
 
 @pytest.mark.asyncio
@@ -191,7 +189,6 @@ async def test_login_social_new_user(make_get_request, clear_db_tables, clear_re
     response = await make_get_request(url=f"{url}/social/login/yandex")
 
     assert response.status == HTTPStatus.OK
-    assert await check_tokens(response, get_from_redis)
 
 
 @pytest.mark.asyncio
@@ -201,13 +198,11 @@ async def test_login_social_existing_user(make_get_request, clear_db_tables, cle
     response = await make_get_request(url=f"{url}/social/login/yandex")
 
     assert response.status == HTTPStatus.OK
-    assert await check_tokens(response, get_from_redis)
 
     # login after user created
     response = await make_get_request(url=f"{url}/social/login/yandex")
 
     assert response.status == HTTPStatus.OK
-    assert await check_tokens(response, get_from_redis)
 
 
 @pytest.mark.asyncio
@@ -223,16 +218,66 @@ async def test_delete_social_user_without_token(make_get_request, make_delete_re
 
 
 @pytest.mark.asyncio
-async def test_delete_social_user_with_token(make_get_request, make_delete_request, clear_db_tables, clear_redis):
+async def test_delete_social_user_with_token(make_get_request, make_delete_request, make_post_request, clear_db_tables, clear_redis):
 
     # register yandex user
     response = await make_get_request(url=f"{url}/social/login/yandex")
     assert response.status == HTTPStatus.OK
 
     # prepare access token
+    request_id = response.body["request_id"]
+    totp_url = url.replace("users", "totp")
+    response = await make_post_request(url=f"{totp_url}/check/{request_id}", data={"code": "1234"})
     access_token = response.body["access_token"]
     headers_access = {"Authorization": f"Bearer {access_token}"}
 
     # delete yandex user
     response = await make_delete_request(url=f"{url}/social/delete/yandex", headers=headers_access)
     assert response.status == HTTPStatus.OK
+
+
+
+@pytest.mark.asyncio
+async def test_add_totp(make_post_request, clear_db_tables, clear_redis, make_get_request, get_from_redis):
+
+    # register
+    await make_post_request(url=f"{url}/register", data=user_data[0][0])
+
+    # login
+    response = await make_post_request(url=f"{url}/login", data=user_data[0][0])
+    assert response.status == HTTPStatus.OK
+    request_id = response.body["request_id"]
+
+    # add totp
+    response = await make_get_request(url=f"{totp_url}/sync/{request_id}")
+    assert response.status == HTTPStatus.CREATED
+
+    # prepare code
+    uri = response.body["url"]
+    p = pyotp.parse_uri(uri)
+    code = str(p.now())
+
+    # confirm code
+    response = await make_post_request(url=f"{totp_url}/sync/{request_id}", data={"code": code})
+    assert response.status == HTTPStatus.CREATED
+    assert await check_tokens(response, get_from_redis)
+
+    # login
+    response = await make_post_request(url=f"{url}/login", data=user_data[0][0])
+    assert response.status == HTTPStatus.OK
+    request_id = response.body["request_id"]
+
+    response = await make_post_request(url=f"{totp_url}/check/{request_id}", data={"code": "123"})
+    assert response.status == HTTPStatus.UNAUTHORIZED
+
+
+    code = str(p.now())
+    response = await make_post_request(url=f"{totp_url}/check/{request_id}", data={"code": code})
+    assert response.status == HTTPStatus.CREATED
+
+
+
+
+
+
+
