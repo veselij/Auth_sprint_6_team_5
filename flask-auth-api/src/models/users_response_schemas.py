@@ -29,6 +29,11 @@ class TokenSchema(Schema):
     refresh_token = fields.Str(required=True)
 
 
+class RequestIdSchema(Schema):
+    request_id = fields.Str(required=True)
+    totp_active = fields.Bool()
+
+
 class SocialTokenSchema(TokenSchema):
     required_fields = fields.List(fields.Str())
 
@@ -76,3 +81,11 @@ class CheckAccessTokenSchema(Schema):
 
 class ProvidersSchema(Schema):
     provider = fields.Str(required=True, validate=OneOf([field.name for field in Providers]))
+
+
+class TotpCodeSchema(Schema):
+    code = fields.Str(required=True)
+
+
+class ProvisioningUrlSchema(Schema):
+    url = fields.Str(required=True)

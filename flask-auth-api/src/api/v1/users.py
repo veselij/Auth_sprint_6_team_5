@@ -17,15 +17,17 @@ from models.users_response_schemas import (
     MsgSchema,
     PaginationSchema,
     ProvidersSchema,
-    SocialTokenSchema,
+    RequestIdSchema,
     TokenSchema,
     UserHistorySchema,
     UserUUIDSchema,
 )
+from services.request import RequestService
 from services.users import UserService
-from social.oauth import testing_oauth as oauth
+from social.oauth import oauth
 from social.providers import Providers
 from social.userdata import user_data_registry
+from utils.exceptions import ConflictError, LoginPasswordError, ObjectDoesNotExistError
 from utils.view_decorators import jwt_verification, revoked_token_check
 
 bp = Blueprint("users", __name__, url_prefix="/api/v1/users")
@@ -74,7 +76,7 @@ class LoginView(CustomSwaggerView):
         HTTPStatus.OK.value: {
             "description": HTTPStatus.OK.phrase,
             "content": {
-                "application/json": {"schema": TokenSchema},
+                "application/json": {"schema": RequestIdSchema},
             },
         },
         HTTPStatus.UNAUTHORIZED.value: {
@@ -87,11 +89,12 @@ class LoginView(CustomSwaggerView):
     def post(self, user_service: UserService = Provide[Container.user_service]) -> Response:
         self.validate_body(AuthSchema)
 
-        user = user_service.autorize_user(self.validated_body["login"], self.validated_body["password"])
-        if not user:
+        try:
+            request_id = user_service.autorize_user(self.validated_body["login"], self.validated_body["password"])
+        except LoginPasswordError:
             return make_response(jsonify(MsgSchema().load(Msg.unauthorized.value)), HTTPStatus.UNAUTHORIZED.value)
         return make_response(
-            jsonify(TokenSchema().dump(user_service.generate_tokens(str(user.id), user.is_superuser))),
+            jsonify(RequestIdSchema().dump(request_id)),
             HTTPStatus.OK.value,
         )
 
@@ -116,15 +119,24 @@ class RefreshView(CustomSwaggerView):
     }
 
     @inject
-    def get(self, user_id: UUID, user_service: UserService = Provide[Container.user_service]) -> Response:
+    def get(
+        self,
+        user_id: UUID,
+        request_service: RequestService = Provide[Container.request_service],
+        user_service: UserService = Provide[Container.user_service],
+    ) -> Response:
         user = str(user_id)
         self.validate_path(UserUUIDSchema)
 
         token = get_jwt()
-        if not user_service.check_refresh_token(token, user):
+        if not request_service.check_refresh_token(token, user):
             return make_response(jsonify(MsgSchema().load(Msg.unauthorized.value)), HTTPStatus.UNAUTHORIZED.value)
         return make_response(
-            jsonify(TokenSchema().dump(user_service.generate_tokens(user, token["admin"]))),
+            jsonify(
+                TokenSchema().dump(
+                    request_service.generate_tokens(user, token["admin"], user_service.get_user_roles(user))
+                )
+            ),
             HTTPStatus.OK.value,
         )
 
@@ -197,7 +209,9 @@ class ChangeUserView(CustomSwaggerView):
         if not user:
             return make_response(jsonify(MsgSchema().load(Msg.not_found.value)), HTTPStatus.NOT_FOUND.value)
 
-        if not user_service.update_user_data(user, self.validated_body):
+        try:
+            user_service.update_user_data(user, self.validated_body)
+        except ConflictError:
             return make_response(jsonify(MsgSchema().load(Msg.alredy_exists.value)), HTTPStatus.CONFLICT.value)
         return make_response(jsonify(MsgSchema().load(Msg.ok.value)), HTTPStatus.OK.value)
 
@@ -278,7 +292,7 @@ class SocialLoginView(CustomSwaggerView):
     responses = {
         HTTPStatus.OK.value: {
             "description": HTTPStatus.OK.phrase,
-            "content": {"application/json": {"schema": SocialTokenSchema}},
+            "content": {"application/json": {"schema": RequestIdSchema}},
         },
         HTTPStatus.NOT_FOUND.value: {
             "description": HTTPStatus.NOT_FOUND.phrase,
@@ -297,12 +311,13 @@ class SocialLoginView(CustomSwaggerView):
         token = client.authorize_access_token()
         user_data = user_data_registry[provider](token, client)
 
-        user_token = user_service.login_via_social_provider(user_data)
-        if not user_token:
+        try:
+            request_id = user_service.login_via_social_provider(user_data)
+        except (ObjectDoesNotExistError, ConflictError):
             return make_response(jsonify(MsgSchema().load(Msg.not_found.value)), HTTPStatus.NOT_FOUND.value)
 
         return make_response(
-            jsonify(SocialTokenSchema().dump(user_token)),
+            jsonify(RequestIdSchema().dump(request_id)),
             HTTPStatus.OK.value,
         )
 
@@ -350,9 +365,10 @@ class DeleteSocialAccountView(CustomSwaggerView):
         self.validate_path(ProvidersSchema)
 
         token = get_jwt()
-        deleted = user_service.delete_social_account(token, provider)
 
-        if not deleted:
+        try:
+            user_service.delete_social_account(token, provider)
+        except ObjectDoesNotExistError:
             return make_response(jsonify(MsgSchema().load(Msg.not_found.value)), HTTPStatus.NOT_FOUND.value)
 
         return make_response(
