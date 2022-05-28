@@ -9,9 +9,9 @@ sequenceDiagram
 	S->>S: Authentication
 	Note right of S: check hash(passwd) with passwd in DB (using dynamic salt)
 	S-->>C: 401 Unauthorized
-	S->>S: generate tokens (access & refresh)
-	S->>R: store in db0 {refesh_token_id: user_id}
-	S->>C: OK(200) (access & refresh tokens)
+	S->>S: generate request_id
+	S->>R: store in db2 request_id: user_id
+	S->>C: OK(200) (request_id)
 ```
 
 **Path**: /users/login
@@ -26,7 +26,6 @@ sequenceDiagram
 **Response Body**:  
 ```
 {
-	"access_token": "access_token",
-	"refresh_token": "refresh_token"
+	"request_id": "",
 }  
 ```

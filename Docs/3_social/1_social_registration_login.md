@@ -21,12 +21,9 @@ sequenceDiagram
 	opt not exists
 	S->>S: create social account and User
 	end
-	S->>S: generate required_fields list and access and refresh tokens for Auth service
-	S->>C: TokenScheme с access_toke & refesh_token & required_fields = list (200)
-	Note left of C: front end logic
-	opt required_fields not empty
-	C->>S: change_user_data
-	S->>C: OK(200)
+	S->>S: generate request_id, required_fields
+	S->>R: store in db2 request_id: user_id,required_fields, totp active, totp secret, totp-sync status, is_admin
+	S->>C: OK(200) (request_id)
 	end
 ```
 
@@ -36,8 +33,6 @@ sequenceDiagram
 **Response Body**
 ```
 {
-	"access_token": "access_token",
-	"refresh_token": "refresh_token",
-	"required_fields": list() #optional
+	"request_id": ""
 }
 ```
