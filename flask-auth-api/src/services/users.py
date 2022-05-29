@@ -7,6 +7,7 @@ from typing import NamedTuple, Optional
 from flask import request
 from flask_jwt_extended import decode_token
 from sqlalchemy.dialects.postgresql.base import UUID
+from sqlalchemy import extract
 
 from core.config import config
 from db.cache import Caches
@@ -88,18 +89,19 @@ class UserService:
         if not self.repository.update_obj_in_db(obj=User, fileds_to_update=fields, id=user.id):
             raise ConflictError
 
-    def get_user_history(self, user_id: str, page_num: int, page_items: int) -> Optional[UserAccessHistory]:
+    def get_user_history(self, user_id: str, page_num: int, page_items: int, year: int, month: int) -> Optional[UserAccessHistory]:
         start = (page_num - 1) * page_items
         end = start + page_items
-        return self.get_user_history_from_db(user_id, start, end)
+        return self.get_user_history_from_db(user_id, start, end, year, month)
 
     def get_user(self, user_id: str) -> Optional[User]:
         return self.repository.get_object_by_field(User, id=user_id)
 
-    def get_user_history_from_db(self, user_id: str, start: int, end: int) -> Optional[UserAccessHistory]:
+    def get_user_history_from_db(self, user_id: str, start: int, end: int, year: int, month: int) -> Optional[UserAccessHistory]:
         user_access_history = self.repository.get_objects_by_field(UserAccessHistory, user_id=user_id)
         if user_access_history:
-            return user_access_history.order_by(UserAccessHistory.login_date.desc()).slice(start, end)
+            month_user_access_history = user_access_history.filter(extract('month', UserAccessHistory.login_date)==month).filter(extract('year', UserAccessHistory.login_date)==year)
+            return month_user_access_history.order_by(UserAccessHistory.login_date.desc()).slice(start, end)
 
     def get_user_roles(self, user_id: str) -> list[Optional[str]]:
         roles = self.repository.get_joined_objects_by_field(Role, User.roles)

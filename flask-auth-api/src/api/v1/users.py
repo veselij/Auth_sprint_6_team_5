@@ -1,3 +1,4 @@
+from datetime import datetime
 from http import HTTPStatus
 from uuid import UUID
 
@@ -15,10 +16,10 @@ from models.users_response_schemas import (
     AuthSchema,
     DefaultPaginator,
     MsgSchema,
-    PaginationSchema,
     ProvidersSchema,
     RequestIdSchema,
     TokenSchema,
+    UserHistoryQuerySchema,
     UserHistorySchema,
     UserUUIDSchema,
 )
@@ -27,7 +28,7 @@ from services.users import UserService
 from social.oauth import oauth
 from social.providers import Providers
 from social.userdata import user_data_registry
-from utils.exceptions import ConflictError, LoginPasswordError, ObjectDoesNotExistError
+from utils.exceptions import ConflictError, LoginPasswordError, ObjectDoesNotExistError, ProviderAuthTokenError
 from utils.view_decorators import jwt_verification, revoked_token_check
 
 bp = Blueprint("users", __name__, url_prefix="/api/v1/users")
@@ -242,6 +243,24 @@ class UserHistoryView(CustomSwaggerView):
                 "default": DefaultPaginator.page_items.value,
             },
         },
+        {
+            "in": "query",
+            "name": "year",
+            "schema": {
+                "type": "integer",
+                "default": datetime.now().year,
+            },
+        },
+        {
+            "in": "query",
+            "name": "month",
+            "schema": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 12,
+                "default": datetime.now().month,
+            },
+        },
     ]
 
     responses = {
@@ -264,12 +283,14 @@ class UserHistoryView(CustomSwaggerView):
     @inject
     def get(self, user_id: str, user_service: UserService = Provide[Container.user_service]) -> Response:
         self.validate_path(UserUUIDSchema)
-        self.validate_query(PaginationSchema)
+        self.validate_query(UserHistoryQuerySchema)
 
         user_history = user_service.get_user_history(
             user_id,
             self.validated_query.get("page_num", DefaultPaginator.page_num.value),
             self.validated_query.get("page_items", DefaultPaginator.page_items.value),
+            self.validated_query.get("year", datetime.now().year),
+            self.validated_query.get("month", datetime.now().month),
         )
         if not user_history:
             return make_response(jsonify(MsgSchema().load(Msg.not_found.value)), HTTPStatus.NOT_FOUND.value)
@@ -309,7 +330,10 @@ class SocialLoginView(CustomSwaggerView):
             return make_response(jsonify(MsgSchema().load(Msg.not_found.value)), HTTPStatus.NOT_FOUND.value)
 
         token = client.authorize_access_token()
-        user_data = user_data_registry[provider](token, client)
+        try:
+            user_data = user_data_registry[provider](token, client)
+        except ProviderAuthTokenError:
+            return make_response(jsonify(MsgSchema().load(Msg.unauthorized.value)), HTTPStatus.UNAUTHORIZED.value)
 
         try:
             request_id = user_service.login_via_social_provider(user_data)
