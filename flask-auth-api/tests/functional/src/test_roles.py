@@ -317,7 +317,7 @@ async def test_check_user_role_revoked_token(
         headers=headers_access,
         data={"access_token": headers_access_user["Authorization"].replace("Bearer ", "")},
     )
-    assert response.status == HTTPStatus.UNAUTHORIZED
+    assert response.status == HTTPStatus.FORBIDDEN
 
 
 @pytest.mark.asyncio

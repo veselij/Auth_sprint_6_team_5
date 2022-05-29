@@ -6,7 +6,7 @@ from flask_jwt_extended import create_access_token, create_refresh_token, get_jt
 
 from core.config import config
 from db.cache import Caches
-from models.db_models import User
+from models.db_models import User, UserAccessHistory
 from repository.repository import Repositiry
 from utils.exceptions import ObjectDoesNotExistError, TotpNotSyncError
 
@@ -96,9 +96,14 @@ class RequestService:
             return self.generate_tokens(user.id, user.is_superuser, user.roles, user.required_fields)
 
         if not user.totp_sync:
+            self.update_login_attempt(request_id)
             raise TotpNotSyncError
 
         totp = pyotp.TOTP(user.totp_secret)
         if not totp.verify(code):
+            self.update_login_attempt(request_id)
             raise ObjectDoesNotExistError
         return self.generate_tokens(user.id, user.is_superuser, user.roles, user.required_fields)
+
+    def update_login_attempt(self, request_id: str):
+        self.repository.update_obj_in_db(UserAccessHistory, {"totp_status": False}, request_id=request_id)
