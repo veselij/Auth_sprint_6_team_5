@@ -1,3 +1,5 @@
+from datetime import datetime
+from functools import partial
 import uuid
 from typing import Optional
 
@@ -6,6 +8,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import backref, relationship
 from sqlalchemy.sql import func
 from sqlalchemy.sql.schema import UniqueConstraint
+from sqlalchemy.event import listen
 
 from db.db import Base
 from utils.password_hashing import verify_password
@@ -70,13 +73,39 @@ class Role(Base):
         return "Role {0}".format(self.role)
 
 
+def create_user_history_partitions(target, connection, **kw) -> None:
+    current_date = datetime.now()
+    year = current_date.year
+    month = current_date.month
+    connection.execute("""CREATE TABLE IF NOT EXISTS "users_access_history_default" PARTITION OF "users_access_history" DEFAULT;""")
+    for m in range(month, 12):
+            connection.execute(
+            f"""CREATE TABLE IF NOT EXISTS "users_access_history_y{year}m{m}" PARTITION OF "users_access_history" FOR VALUES FROM ('{year}-{m}-01') TO ('{year}-{m + 1}-01')"""
+        )
+
+
+def on_table_create(class_, ddl):
+
+    def listener(tablename, ddl, table, bind, **kw):
+        if table.name == tablename:
+            ddl(table, bind, **kw)
+
+    listen(Table, 'after_create', partial(listener, class_.__table__.name, ddl))
+
+
 class UserAccessHistory(Base):
     __tablename__ = "users_access_history"
+    __table_args__ = (
+        UniqueConstraint('id', 'login_date', name="user_acc_hist_id_login_date"),
+        {
+            'postgresql_partition_by': 'RANGE (login_date)',
+        }
+    )
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     user_agent = Column(String, nullable=True)
-    login_date = Column(DateTime(timezone=True), server_default=func.now())
+    login_date = Column(DateTime(timezone=True), primary_key=True, server_default=func.now())
     login_status = Column(Boolean, nullable=False)
     service_name = Column(String, nullable=True)
     request_id = Column(String, nullable=False)
@@ -112,3 +141,6 @@ class SocialAccount(Base):
 
     def __repr__(self) -> str:
         return f"<SocialAccount {self.social_name}:{self.user_id}>"
+
+
+on_table_create(UserAccessHistory, create_user_history_partitions)

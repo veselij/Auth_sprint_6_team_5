@@ -65,6 +65,11 @@ class PaginationSchema(Schema):
     )
 
 
+class UserHistoryQuerySchema(PaginationSchema):
+    year = fields.Int()
+    month = fields.Int(validate=Range(1, 12))
+
+
 class RoleSchema(Schema):
     id = fields.UUID(required=False)
     role = fields.Str(required=True)

@@ -24,3 +24,7 @@ class InvalidTokenError(Exception):
 
 class TotpNotSyncError(Exception):
     "Totp not ready for use, sync first."
+
+
+class ProviderAuthTokenError(Exception):
+    "Provider failed to decode auth token."

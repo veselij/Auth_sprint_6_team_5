@@ -1,7 +1,10 @@
 from dataclasses import dataclass
 from typing import Any
 
+import requests
+
 from social.providers import Providers
+from utils.exceptions import ProviderAuthTokenError
 
 
 @dataclass
@@ -17,7 +20,10 @@ def get_user_data_from_google(token: dict, client: Any):
 
 
 def get_user_data_from_yandex(token: dict, client: Any):
-    user_data = client.userinfo()
+    try:
+        user_data = client.userinfo()
+    except requests.exceptions.HTTPError:
+        raise ProviderAuthTokenError
     return UserData(
         social_id=user_data["psuid"], social_service=Providers.yandex.value, user_email=user_data["default_email"]
     )

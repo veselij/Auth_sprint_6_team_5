@@ -38,5 +38,4 @@ def create_app() -> Flask:
 if __name__ == "__main__":
     app = create_app()
     oauth.init_app(app)
-
     app.run(debug=True, threaded=False, port=8000)
