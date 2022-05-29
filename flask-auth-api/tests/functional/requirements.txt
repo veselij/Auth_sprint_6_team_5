@@ -5,3 +5,4 @@ multidict
 aioredis
 psycopg2
 pyjwt
+pyotp

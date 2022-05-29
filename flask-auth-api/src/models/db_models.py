@@ -79,12 +79,15 @@ class UserAccessHistory(Base):
     login_date = Column(DateTime(timezone=True), server_default=func.now())
     login_status = Column(Boolean, nullable=False)
     service_name = Column(String, nullable=True)
+    request_id = Column(String, nullable=False)
+    totp_status = Column(Boolean, default=True, nullable=False)
 
-    def __init__(self, user_id: UUID, user_agent: str, login_status: bool, service_name: Optional[str] = None) -> None:
+    def __init__(self, user_id: UUID, user_agent: str, login_status: bool, request_id: str, service_name: Optional[str] = None) -> None:
         self.user_id = user_id
         self.user_agent = user_agent
         self.login_status = login_status
         self.service_name = service_name
+        self.request_id = request_id
 
     def __repr__(self) -> str:
         return "User {0} access {1} with status {2}".format(self.user_id, self.login_date, self.login_status)

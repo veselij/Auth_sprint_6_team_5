@@ -19,6 +19,7 @@ from models.users_response_schemas import (
 )
 from services.roles import RoleService
 from services.users import UserService
+from utils.exceptions import InvalidTokenError
 from utils.view_decorators import jwt_verification, revoked_token_check
 
 bp = Blueprint("roles", __name__, url_prefix="/api/v1/roles")
@@ -200,15 +201,20 @@ class CheckUserRole(CustomSwaggerView):
             "description": HTTPStatus.UNAUTHORIZED.phrase,
             "content": {"application/json": {"schema": MsgSchema, "example": Msg.unauthorized.value}},
         },
+        HTTPStatus.FORBIDDEN.value: {
+            "description": HTTPStatus.FORBIDDEN.phrase,
+            "content": {"application/json": {"schema": MsgSchema, "example": Msg.forbidden.value}},
+        },
     }
 
     @inject
     def post(self, user_service: UserService = Provide[Container.user_service]) -> Response:
         self.validate_body(CheckAccessTokenSchema)
 
-        roles = user_service.check_user_roles(self.validated_body["access_token"])
-        if roles is None:
-            return make_response(jsonify(MsgSchema().load(Msg.unauthorized.value)), HTTPStatus.UNAUTHORIZED.value)
+        try:
+            roles = user_service.check_user_roles(self.validated_body["access_token"])
+        except InvalidTokenError:
+            return make_response(jsonify(MsgSchema().load(Msg.forbidden.value)), HTTPStatus.FORBIDDEN.value)
 
         return make_response(jsonify(UserRoleSchema().load({"role_id": roles})), HTTPStatus.OK.value)
 

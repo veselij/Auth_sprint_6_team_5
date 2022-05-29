@@ -43,25 +43,25 @@ class UserService:
         user = User(login=username, password=get_password_hash(password))
         return self.repository.create_obj_in_db(user)
 
-    def log_login_attempt(self, user_id: UUID, status: bool, social_service: Optional[str] = None) -> None:
+    def log_login_attempt(self, user_id: UUID, status: bool, request_id: str, social_service: Optional[str] = None) -> None:
         user_agent = request.headers.get("User-Agent")
         login_attempt = UserAccessHistory(
-            user_id=user_id, user_agent=user_agent, login_status=status, service_name=social_service
+            user_id=user_id, user_agent=user_agent, login_status=status, request_id=request_id, service_name=social_service
         )
         self.repository.create_obj_in_db(login_attempt)
 
     def autorize_user(self, login: str, password: str) -> RequestId:
         user = self.repository.get_object_by_field(User, login=login)
+        request_id = generate_random_string()
         if not user:
             raise LoginPasswordError
         if not user.check_password(password):
-            self.log_login_attempt(user.id, False)
+            self.log_login_attempt(user.id, False, request_id)
             raise LoginPasswordError
-        self.log_login_attempt(user.id, True)
-        return self.generate_request_id(user)
+        self.log_login_attempt(user.id, True, request_id)
+        return self.generate_request_id(user, request_id)
 
-    def generate_request_id(self, user: User, required_fields: Optional[list] = None) -> RequestId:
-        request_id = generate_random_string()
+    def generate_request_id(self, user: User, request_id:str, required_fields: Optional[list] = None) -> RequestId:
         user_data = user.to_dict()
         user_data["required_fields"] = required_fields or []
         user_data["roles"] = self.get_user_roles(user.id)
@@ -149,16 +149,17 @@ class UserService:
         social_account = self.repository.get_object_by_field(
             SocialAccount, social_id=user_data.social_id, social_name=user_data.social_service
         )
+        request_id = generate_random_string()
         if not social_account:
             user = self.create_social_account(user_data)
             required_fields = [field.name for field in fields(UserRandomFields)]
-            return self.generate_request_id(user, required_fields)
+            return self.generate_request_id(user, request_id, required_fields)
 
         user = self.repository.get_object_by_field(User, id=social_account.user_id)
         if not user:
             raise ObjectDoesNotExistError
         self.log_login_attempt(user.id, True, user_data.social_service)
-        return self.generate_request_id(user)
+        return self.generate_request_id(user, request_id)
 
     def delete_social_account(self, token: dict, provider: str) -> None:
         user_id = str(token["sub"])
