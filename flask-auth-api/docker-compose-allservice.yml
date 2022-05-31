@@ -80,7 +80,7 @@ services:
     ports:
       - 6379:6379
   fastapi:
-    build: https://github.com/veselij/Async_API_sprint_1_team5.git#main
+    build: https://github.com/veselij/Async_API_sprint_1_team5.git#search_by_subscription
     container_name: fastapi
     networks:
       - backend_nw
