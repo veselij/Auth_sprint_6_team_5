@@ -53,14 +53,14 @@ class CacheManager:
 @dataclass
 class Caches:
     access_cache: CacheManager = CacheManager(
-        Redis(connection_pool=ConnectionPool(host=config.redis_host, port=config.redis_port, db=0)),
+        Redis(connection_pool=ConnectionPool(host=config.redis_host, port=config.redis_port, db=3)),
         ConnectionError,
     )
     refresh_cache: CacheManager = CacheManager(
-        Redis(connection_pool=ConnectionPool(host=config.redis_host, port=config.redis_port, db=1)),
-        ConnectionError,
+        Redis(connection_pool=ConnectionPool(host=config.redis_host, port=config.redis_port, db=4)),
+        ConnectionError
     )
     request_cache: CacheManager = CacheManager(
-        Redis(connection_pool=ConnectionPool(host=config.redis_host, port=config.redis_port, db=2)),
+        Redis(connection_pool=ConnectionPool(host=config.redis_host, port=config.redis_port, db=5)),
         ConnectionError,
     )

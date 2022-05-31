@@ -106,7 +106,7 @@ class UserService:
     def get_user_roles(self, user_id: str) -> list[Optional[str]]:
         roles = self.repository.get_joined_objects_by_field(Role, User.roles)
         if roles:
-            return [str(r.id) for r in roles.filter(User.id == user_id).all()]
+            return [str(r.name) for r in roles.filter(User.id == user_id).all()]
         return []
 
     def add_user_roles(self, user_id: str, role_ids: list) -> bool:

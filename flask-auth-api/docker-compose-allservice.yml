@@ -1,0 +1,127 @@
+version: '3.0'
+
+services:
+  admin_panel:
+    container_name: admin_panel
+    build: https://github.com/veselij/ya_admin_panel.git#main
+    networks:
+      - backend_nw
+    volumes:
+      - code:/code
+    env_file:
+      - .admin_panel.env
+    expose:
+      - 8000
+    depends_on:
+      - db
+  db:
+    image: postgres:13
+    container_name: pg_server
+    networks:
+      - backend_nw
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    env_file:
+      - ./.postgres.env
+  db_auth:
+    image: postgres:13
+    container_name: pg_server_auth
+    networks:
+      - backend_nw
+    volumes:
+      - pg_data_auth:/var/lib/postgresql/data
+    env_file:
+      - ./.postgres_auth.env
+  nginx:
+    image: nginx:1.21.6
+    depends_on:
+      - admin_panel
+      - fastapi
+    ports:
+      - 80:80
+      - 81:81
+      - 82:82
+    networks:
+      - backend_nw
+    volumes:
+      - code:/data:ro
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/configs:/etc/nginx/conf.d/:ro
+  es:
+    image: elasticsearch:7.17.1
+    container_name: es_server
+    networks:
+      - backend_nw
+    environment:
+      - discovery.type=single-node
+    ports:
+      - 9200:9200
+    volumes:
+      - esdata:/usr/share/elasticsearch/data:rw
+  etl_service:
+    build: https://github.com/veselij/ya_etl.git#main
+    container_name: etl_service
+    networks:
+      - backend_nw
+    volumes:
+      - code_elt:/code
+    env_file:
+      - ./.etl.env
+    depends_on:
+      - admin_panel
+      - es
+  redis:
+    image: redis:6.2.6
+    container_name: redis
+    networks:
+      - backend_nw
+    volumes:
+      - redis_data:/data
+    ports:
+      - 6379:6379
+  fastapi:
+    build: https://github.com/veselij/Async_API_sprint_1_team5.git#main
+    container_name: fastapi
+    networks:
+      - backend_nw
+    volumes:
+      - code_api:/code
+    env_file:
+      - .fastapi.env
+    expose:
+      - 8000
+    depends_on:
+      - etl_service
+      - redis
+  auth:
+    container_name: auth
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    networks:
+      - backend_nw
+    volumes:
+      - code_api_auth:/code
+    env_file:
+      - .auth.env
+    entrypoint: 
+      - entrypoint.sh
+    expose:
+      - 8001
+    depends_on:
+      - db_auth
+      - redis
+
+volumes:
+  code:
+  code_elt:
+  code_api:
+  code_api_auth:
+  pg_data:
+  pg_data_auth:
+  esdata:
+  redis_data:
+
+networks:
+  backend_nw:
+    driver: bridge

@@ -182,7 +182,7 @@ class UserRoles(CustomSwaggerView):
 
 
 class CheckUserRole(CustomSwaggerView):
-    decorators = [revoked_token_check(), jwt_verification(superuser_only=True)]
+    #decorators = [revoked_token_check(), jwt_verification(superuser_only=True)]
 
     tags = ["roles"]
 
@@ -214,7 +214,7 @@ class CheckUserRole(CustomSwaggerView):
         try:
             roles = user_service.check_user_roles(self.validated_body["access_token"])
         except InvalidTokenError:
-            return make_response(jsonify(MsgSchema().load(Msg.forbidden.value)), HTTPStatus.FORBIDDEN.value)
+            return make_response(jsonify(UserRoleSchema().load({"role_id": []})), HTTPStatus.OK.value)
 
         return make_response(jsonify(UserRoleSchema().load({"role_id": roles})), HTTPStatus.OK.value)
 
