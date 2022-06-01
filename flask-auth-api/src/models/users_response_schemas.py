@@ -59,9 +59,15 @@ class UserHistorySchema(Schema):
 
 
 class PaginationSchema(Schema):
-    page_num = fields.Int(validate=Range(DefaultPaginator.min_page_num.value, DefaultPaginator.max_page_num.value))
+    page_num = fields.Int(
+        validate=Range(
+            DefaultPaginator.min_page_num.value, DefaultPaginator.max_page_num.value
+        )
+    )
     page_items = fields.Int(
-        validate=Range(DefaultPaginator.min_page_items.value, DefaultPaginator.max_page_items.value),
+        validate=Range(
+            DefaultPaginator.min_page_items.value, DefaultPaginator.max_page_items.value
+        ),
     )
 
 
@@ -77,7 +83,7 @@ class RoleSchema(Schema):
 
 
 class UserRoleSchema(Schema):
-    role_id = fields.List(fields.UUID(), required=True)
+    role_id = fields.List(fields.Str(), required=True)
 
 
 class CheckAccessTokenSchema(Schema):
@@ -85,7 +91,9 @@ class CheckAccessTokenSchema(Schema):
 
 
 class ProvidersSchema(Schema):
-    provider = fields.Str(required=True, validate=OneOf([field.name for field in Providers]))
+    provider = fields.Str(
+        required=True, validate=OneOf([field.name for field in Providers])
+    )
 
 
 class TotpCodeSchema(Schema):
