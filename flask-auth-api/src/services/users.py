@@ -45,7 +45,11 @@ class UserService:
         return self.repository.create_obj_in_db(user)
 
     def log_login_attempt(
-        self, user_id: UUID, status: bool, request_id: str, social_service: Optional[str] = None
+        self,
+        user_id: UUID,
+        status: bool,
+        request_id: str,
+        social_service: Optional[str] = None,
     ) -> None:
         user_agent = request.headers.get("User-Agent")
         login_attempt = UserAccessHistory(
@@ -68,11 +72,15 @@ class UserService:
         self.log_login_attempt(user.id, True, request_id)
         return self.generate_request_id(user, request_id)
 
-    def generate_request_id(self, user: User, request_id: str, required_fields: Optional[list] = None) -> RequestId:
+    def generate_request_id(
+        self, user: User, request_id: str, required_fields: Optional[list] = None
+    ) -> RequestId:
         user_data = user.to_dict()
         user_data["required_fields"] = required_fields or []
         user_data["roles"] = self.get_user_roles(user.id)
-        self.cache.request_cache.set_value(request_id, json.dumps(user_data), config.request_ttl)
+        self.cache.request_cache.set_value(
+            request_id, json.dumps(user_data), config.request_ttl
+        )
         return RequestId(request_id, user.totp_active)
 
     def revoke_access_token(self, token: dict, user_id: str, all: str) -> None:
@@ -87,12 +95,16 @@ class UserService:
             data[jti] = value
         else:
             data = {jti: value}
-        self.cache.access_cache.set_value(str(user_id), json.dumps(data), ex=config.refresh_ttl)
+        self.cache.access_cache.set_value(
+            str(user_id), json.dumps(data), ex=config.refresh_ttl
+        )
 
     def update_user_data(self, user: User, fields: dict) -> None:
         if "password" in fields:
             fields["password"] = get_password_hash(fields["password"])
-        if not self.repository.update_obj_in_db(obj=User, fileds_to_update=fields, id=user.id):
+        if not self.repository.update_obj_in_db(
+            obj=User, fileds_to_update=fields, id=user.id
+        ):
             raise ConflictError
 
     def get_user_history(
@@ -108,26 +120,34 @@ class UserService:
     def get_user_history_from_db(
         self, user_id: str, start: int, end: int, year: int, month: int
     ) -> Optional[UserAccessHistory]:
-        user_access_history = self.repository.get_objects_by_field(UserAccessHistory, user_id=user_id)
+        user_access_history = self.repository.get_objects_by_field(
+            UserAccessHistory, user_id=user_id
+        )
         if user_access_history:
             month_user_access_history = user_access_history.filter(
                 extract("month", UserAccessHistory.login_date) == month
             ).filter(extract("year", UserAccessHistory.login_date) == year)
-            return month_user_access_history.order_by(UserAccessHistory.login_date.desc()).slice(start, end)
+            return month_user_access_history.order_by(
+                UserAccessHistory.login_date.desc()
+            ).slice(start, end)
 
     def get_user_roles(self, user_id: str) -> list[Optional[str]]:
         roles = self.repository.get_joined_objects_by_field(Role, User.roles)
         if roles:
-            return [str(r.name) for r in roles.filter(User.id == user_id).all()]
+            return [str(r.role) for r in roles.filter(User.id == user_id).all()]
         return []
 
     def add_user_roles(self, user_id: str, role_ids: list) -> bool:
         self.revoke_access_token({}, user_id, "true")
-        return self.repository.add_many_to_many_row(User, user_id, Role, role_ids, "roles")
+        return self.repository.add_many_to_many_row(
+            User, user_id, Role, role_ids, "roles"
+        )
 
     def remove_user_roles(self, user_id: str, role_ids: list) -> bool:
         self.revoke_access_token({}, user_id, "true")
-        return self.repository.remove_many_to_many_row(User, user_id, Role, role_ids, "roles")
+        return self.repository.remove_many_to_many_row(
+            User, user_id, Role, role_ids, "roles"
+        )
 
     def check_user_roles(self, access_token: str) -> list:
         token = decode_token(access_token)
@@ -144,7 +164,9 @@ class UserService:
             user = User(**asdict(random_fields))
             user.email = email
             if self.repository.create_obj_in_db(user):
-                return self.repository.get_object_by_field(User, login=random_fields.login)
+                return self.repository.get_object_by_field(
+                    User, login=random_fields.login
+                )
             attempts -= 1
         return
 
@@ -153,7 +175,9 @@ class UserService:
         if not user:
             raise ConflictError
         social_account = SocialAccount(
-            social_id=user_data.social_id, social_name=user_data.social_service, user_id=user.id
+            social_id=user_data.social_id,
+            social_name=user_data.social_service,
+            user_id=user.id,
         )
         self.repository.create_obj_in_db(social_account)
         self.log_login_attempt(user.id, True, user_data.social_service)
@@ -161,7 +185,9 @@ class UserService:
 
     def login_via_social_provider(self, user_data: UserData) -> RequestId:
         social_account = self.repository.get_object_by_field(
-            SocialAccount, social_id=user_data.social_id, social_name=user_data.social_service
+            SocialAccount,
+            social_id=user_data.social_id,
+            social_name=user_data.social_service,
         )
         request_id = generate_random_string()
         if not social_account:
@@ -178,5 +204,7 @@ class UserService:
     def delete_social_account(self, token: dict, provider: str) -> None:
         user_id = str(token["sub"])
         self.revoke_access_token(token, user_id, "true")
-        if not self.repository.delete_object_by_field(SocialAccount, user_id=user_id, social_name=provider):
+        if not self.repository.delete_object_by_field(
+            SocialAccount, user_id=user_id, social_name=provider
+        ):
             raise ObjectDoesNotExistError
