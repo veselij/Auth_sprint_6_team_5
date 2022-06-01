@@ -182,7 +182,6 @@ class UserRoles(CustomSwaggerView):
 
 
 class CheckUserRole(CustomSwaggerView):
-    #decorators = [revoked_token_check(), jwt_verification(superuser_only=True)]
 
     tags = ["roles"]
 

@@ -28,7 +28,12 @@ from services.users import UserService
 from social.oauth import oauth
 from social.providers import Providers
 from social.userdata import user_data_registry
-from utils.exceptions import ConflictError, LoginPasswordError, ObjectDoesNotExistError, ProviderAuthTokenError
+from utils.exceptions import (
+    ConflictError,
+    LoginPasswordError,
+    ObjectDoesNotExistError,
+    ProviderAuthTokenError,
+)
 from utils.view_decorators import jwt_verification, revoked_token_check
 
 bp = Blueprint("users", __name__, url_prefix="/api/v1/users")

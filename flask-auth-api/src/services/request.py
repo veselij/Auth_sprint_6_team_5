@@ -1,5 +1,5 @@
-from datetime import datetime
 import json
+from datetime import datetime
 from typing import NamedTuple, Optional, Union
 
 import pyotp
@@ -107,4 +107,9 @@ class RequestService:
         return self.generate_tokens(user.id, user.is_superuser, user.roles, user.required_fields)
 
     def update_login_attempt(self, request_id: str):
-        self.repository.update_obj_in_db(UserAccessHistory, {"totp_status": False}, request_id=request_id, login_date=datetime.now().strftime('%Y-%m-%d'))
+        self.repository.update_obj_in_db(
+            UserAccessHistory,
+            {"totp_status": False},
+            request_id=request_id,
+            login_date=datetime.now().strftime("%Y-%m-%d"),
+        )

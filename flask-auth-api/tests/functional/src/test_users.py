@@ -218,7 +218,9 @@ async def test_delete_social_user_without_token(make_get_request, make_delete_re
 
 
 @pytest.mark.asyncio
-async def test_delete_social_user_with_token(make_get_request, make_delete_request, make_post_request, clear_db_tables, clear_redis):
+async def test_delete_social_user_with_token(
+    make_get_request, make_delete_request, make_post_request, clear_db_tables, clear_redis
+):
 
     # register yandex user
     response = await make_get_request(url=f"{url}/social/login/yandex")
@@ -234,7 +236,6 @@ async def test_delete_social_user_with_token(make_get_request, make_delete_reque
     # delete yandex user
     response = await make_delete_request(url=f"{url}/social/delete/yandex", headers=headers_access)
     assert response.status == HTTPStatus.OK
-
 
 
 @pytest.mark.asyncio
@@ -270,14 +271,6 @@ async def test_add_totp(make_post_request, clear_db_tables, clear_redis, make_ge
     response = await make_post_request(url=f"{totp_url}/check/{request_id}", data={"code": "123"})
     assert response.status == HTTPStatus.UNAUTHORIZED
 
-
     code = str(p.now())
     response = await make_post_request(url=f"{totp_url}/check/{request_id}", data={"code": code})
     assert response.status == HTTPStatus.CREATED
-
-
-
-
-
-
-

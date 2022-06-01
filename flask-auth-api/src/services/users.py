@@ -6,8 +6,8 @@ from typing import NamedTuple, Optional
 
 from flask import request
 from flask_jwt_extended import decode_token
-from sqlalchemy.dialects.postgresql.base import UUID
 from sqlalchemy import extract
+from sqlalchemy.dialects.postgresql.base import UUID
 
 from core.config import config
 from db.cache import Caches
@@ -44,10 +44,16 @@ class UserService:
         user = User(login=username, password=get_password_hash(password))
         return self.repository.create_obj_in_db(user)
 
-    def log_login_attempt(self, user_id: UUID, status: bool, request_id: str, social_service: Optional[str] = None) -> None:
+    def log_login_attempt(
+        self, user_id: UUID, status: bool, request_id: str, social_service: Optional[str] = None
+    ) -> None:
         user_agent = request.headers.get("User-Agent")
         login_attempt = UserAccessHistory(
-            user_id=user_id, user_agent=user_agent, login_status=status, request_id=request_id, service_name=social_service
+            user_id=user_id,
+            user_agent=user_agent,
+            login_status=status,
+            request_id=request_id,
+            service_name=social_service,
         )
         self.repository.create_obj_in_db(login_attempt)
 
@@ -62,7 +68,7 @@ class UserService:
         self.log_login_attempt(user.id, True, request_id)
         return self.generate_request_id(user, request_id)
 
-    def generate_request_id(self, user: User, request_id:str, required_fields: Optional[list] = None) -> RequestId:
+    def generate_request_id(self, user: User, request_id: str, required_fields: Optional[list] = None) -> RequestId:
         user_data = user.to_dict()
         user_data["required_fields"] = required_fields or []
         user_data["roles"] = self.get_user_roles(user.id)
@@ -89,7 +95,9 @@ class UserService:
         if not self.repository.update_obj_in_db(obj=User, fileds_to_update=fields, id=user.id):
             raise ConflictError
 
-    def get_user_history(self, user_id: str, page_num: int, page_items: int, year: int, month: int) -> Optional[UserAccessHistory]:
+    def get_user_history(
+        self, user_id: str, page_num: int, page_items: int, year: int, month: int
+    ) -> Optional[UserAccessHistory]:
         start = (page_num - 1) * page_items
         end = start + page_items
         return self.get_user_history_from_db(user_id, start, end, year, month)
@@ -97,10 +105,14 @@ class UserService:
     def get_user(self, user_id: str) -> Optional[User]:
         return self.repository.get_object_by_field(User, id=user_id)
 
-    def get_user_history_from_db(self, user_id: str, start: int, end: int, year: int, month: int) -> Optional[UserAccessHistory]:
+    def get_user_history_from_db(
+        self, user_id: str, start: int, end: int, year: int, month: int
+    ) -> Optional[UserAccessHistory]:
         user_access_history = self.repository.get_objects_by_field(UserAccessHistory, user_id=user_id)
         if user_access_history:
-            month_user_access_history = user_access_history.filter(extract('month', UserAccessHistory.login_date)==month).filter(extract('year', UserAccessHistory.login_date)==year)
+            month_user_access_history = user_access_history.filter(
+                extract("month", UserAccessHistory.login_date) == month
+            ).filter(extract("year", UserAccessHistory.login_date) == year)
             return month_user_access_history.order_by(UserAccessHistory.login_date.desc()).slice(start, end)
 
     def get_user_roles(self, user_id: str) -> list[Optional[str]]:
