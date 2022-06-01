@@ -289,7 +289,7 @@ async def test_check_user_role(
         data={"access_token": headers_access_user["Authorization"].replace("Bearer ", "")},
     )
     assert response.status == HTTPStatus.OK
-    assert response.body["role_id"][0] == role_name
+    assert response.body[0] == role_name
 
 
 @pytest.mark.asyncio
