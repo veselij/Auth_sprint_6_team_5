@@ -249,8 +249,8 @@ async def test_delete_user_role_not_exist(
     assert response.status == HTTPStatus.OK
 
     # delete not exising role by superuser from normal user
-    response = await make_delete_request(url=f"{url}/user/{uuid}", headers=headers_access, data={"role_id": ["1"]})
-    assert response.status == HTTPStatus.BAD_REQUEST
+    response = await make_delete_request(url=f"{url}/user/{uuid}", headers=headers_access, data={"role_id": ["0774bba8-e050-40d0-a490-2a1c6fe33472"]})
+    assert response.status == HTTPStatus.NOT_FOUND
 
 
 @pytest.mark.asyncio
@@ -265,6 +265,7 @@ async def test_check_user_role(
     # get created role_id
     response = await make_get_request(url=f"{url}/", headers=headers_access)
     role_id = response.body[0]["id"]
+    role_name = response.body[0]["role"]
 
     # get user UUID and refesh_token
     _, headers_refresh, uuid = await prepare_user(url_users, user_data[3][0])
@@ -288,36 +289,7 @@ async def test_check_user_role(
         data={"access_token": headers_access_user["Authorization"].replace("Bearer ", "")},
     )
     assert response.status == HTTPStatus.OK
-    assert response.body["role_id"][0] == role_id
-
-
-@pytest.mark.asyncio
-async def test_check_user_role_revoked_token(
-    make_delete_request, clear_db_tables, clear_redis, insert_roles, make_get_request, prepare_user, make_post_request
-):
-
-    # create roles and get superuser access_token
-    response, headers_access = await insert_roles()
-    assert response.status == HTTPStatus.CREATED
-
-    # get created role_id
-    response = await make_get_request(url=f"{url}/", headers=headers_access)
-    role_id = response.body[0]["id"]
-
-    # get user UUID and access_token
-    headers_access_user, _, uuid = await prepare_user(url_users, user_data[3][0])
-
-    # add role to user with superuser
-    response = await make_post_request(url=f"{url}/user/{uuid}", headers=headers_access, data={"role_id": [role_id]})
-    assert response.status == HTTPStatus.OK
-
-    # check with superuser revoked user access_token
-    response = await make_post_request(
-        url=f"{url}/user/check",
-        headers=headers_access,
-        data={"access_token": headers_access_user["Authorization"].replace("Bearer ", "")},
-    )
-    assert response.status == HTTPStatus.FORBIDDEN
+    assert response.body["role_id"][0] == role_name
 
 
 @pytest.mark.asyncio

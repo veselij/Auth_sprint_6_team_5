@@ -3,25 +3,16 @@ version: '3.0'
 services:
   db:
     image: postgres:13
-    container_name: pg_server
+    container_name: pg_server_auth
     networks:
       - backend_nw
     volumes:
-      - pg_data:/var/lib/postgresql/data
+      - pg_data_auth:/var/lib/postgresql/data
     env_file:
-      - ./.postgres.env
-  nginx:
-    image: nginx:1.21.6
-    depends_on:
-      - auth
+      - ./.postgres_auth.env
     ports:
-      - 80:80
-    networks:
-      - backend_nw
-    volumes:
-      - code:/data:ro
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/configs:/etc/nginx/conf.d/:ro
+      - 5432:5432
+
   redis:
     image: redis:6.2.6
     container_name: redis
@@ -29,8 +20,8 @@ services:
       - backend_nw
     volumes:
       - redis_data:/data
-    expose:
-      - 6379
+    ports:
+      - 6379:6379
   auth:
     container_name: auth
     build:
@@ -39,21 +30,21 @@ services:
     networks:
       - backend_nw
     volumes:
-      - code_api:/code
+      - code_api_auth:/code
     env_file:
       - .auth.env
     entrypoint: 
       - entrypoint.sh
-    expose:
-      - 8000
+    ports:
+      - 8001:8001
     depends_on:
       - db
       - redis
 
 volumes:
   code:
-  code_api:
-  pg_data:
+  code_api_auth:
+  pg_data_auth:
   redis_data:
 
 networks:

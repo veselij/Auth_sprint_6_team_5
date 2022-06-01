@@ -7,7 +7,7 @@ from settings import config
 @pytest_asyncio.fixture(scope="session")
 async def redis_client():
     client = await aioredis.from_url(
-        "redis://{0}:{1}".format(config.redis_host, config.redis_port), db=1, decode_responses=True
+        "redis://{0}:{1}".format(config.redis_host, config.redis_port), db=4, decode_responses=True
     )
     yield client
     await client.close()

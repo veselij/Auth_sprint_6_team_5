@@ -3,19 +3,14 @@ from datetime import datetime
 from typing import NamedTuple, Optional, Union
 
 import pyotp
-from flask_jwt_extended import create_access_token, create_refresh_token, get_jti
+from flask_jwt_extended import get_jti
 
 from core.config import config
 from db.cache import Caches
 from models.db_models import User, UserAccessHistory
 from repository.repository import Repositiry
 from utils.exceptions import ObjectDoesNotExistError, TotpNotSyncError
-
-
-class Token(NamedTuple):
-    access_token: str
-    refresh_token: str
-    required_fields: list
+from utils.tokens import Token, get_token
 
 
 class ProvisioningUrl(NamedTuple):
@@ -49,16 +44,9 @@ class RequestService:
         self, user_id: str, is_superuser: Union[bool, int], roles: list, required_fields: Optional[list] = None
     ) -> Token:
         required_fields = required_fields or []
-        access_token = create_access_token(
-            identity=user_id,
-            additional_claims={"roles": roles, "admin": int(is_superuser)},
-        )
-        refresh_token = create_refresh_token(
-            identity=user_id,
-            additional_claims={"related_access_token": get_jti(access_token), "admin": int(is_superuser)},
-        )
-        self.cache.refresh_cache.set_value(name=str(get_jti(refresh_token)), value=user_id, ex=config.refresh_ttl)
-        return Token(access_token, refresh_token, required_fields)
+        token = get_token(user_id, is_superuser, roles, required_fields)
+        self.cache.refresh_cache.set_value(name=str(get_jti(token.refresh_token)), value=user_id, ex=config.refresh_ttl)
+        return token
 
     def get_user_data_from_cache(self, request_id) -> RedisUser:
         user_data = self.cache.request_cache.get_value(request_id)
@@ -72,24 +60,21 @@ class RequestService:
     def update_user_totp_status(self, user_id: str) -> None:
         self.repository.update_obj_in_db(User, {"totp_active": True, "totp_sync": True}, id=user_id)
 
-    def generate_provisioning_url(self, request_id: str) -> ProvisioningUrl:
-        user = self.get_user_data_from_cache(request_id)
+    def generate_provisioning_url(self, token: dict) -> ProvisioningUrl:
         secret = pyotp.random_base32()
         totp = pyotp.TOTP(secret)
-        self.update_user_secret(secret, user.id)
-        provisioning_url = totp.provisioning_uri(name=user.login, issuer_name=config.project_name)
+        self.update_user_secret(secret, token["sub"])
+        provisioning_url = totp.provisioning_uri(name=token["sub"], issuer_name=config.project_name)
         return ProvisioningUrl(provisioning_url)
 
-    def activate_totp(self, request_id: str, code: str) -> Token:
-        user = self.get_user_data_from_cache(request_id)
-        db_user = self.repository.get_object_by_field(User, id=user.id)
+    def activate_totp(self, token: dict, code: str) -> None:
+        db_user = self.repository.get_object_by_field(User, id=token["sub"])
         if not db_user:
             raise ObjectDoesNotExistError
         totp = pyotp.TOTP(db_user.totp_secret)
         if not totp.verify(code):
             raise ObjectDoesNotExistError
-        self.update_user_totp_status(user.id)
-        return self.generate_tokens(user.id, user.is_superuser, user.roles, user.required_fields)
+        self.update_user_totp_status(token["sub"])
 
     def check_totp(self, request_id: str, code: str) -> Token:
         user = self.get_user_data_from_cache(request_id)

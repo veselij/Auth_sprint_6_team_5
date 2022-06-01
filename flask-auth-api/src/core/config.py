@@ -28,7 +28,7 @@ class ConfigSettings(BaseSettings):
     superuser_password: Optional[str] = Field(None, env="SUPERUSER_PASSWORD")
 
     secret: str = Field("7da9c735ec6e9e9c2a5a8731a39a3a71547c4c8f99d4057e1a5eab0243dc9938", env="SECRET")
-    access_ttl: int = Field(120 * 60, env="ACCESS_TTL")
+    access_ttl: int = Field(60 * 60, env="ACCESS_TTL")
     refresh_ttl: int = Field(60 * 60 * 24, env="REFRESH_TTL")
 
     api_name: str = Field("Auth API", env="API_NAME")

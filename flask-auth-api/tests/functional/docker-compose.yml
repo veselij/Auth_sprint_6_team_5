@@ -3,13 +3,13 @@ version: '3.0'
 services:
   db:
     image: postgres:13
-    container_name: pg_server
+    container_name: pg_server_auth
     networks:
       - backend_nw
     volumes:
       - pg_data:/var/lib/postgresql/data
     env_file:
-      - ../../.postgres.env
+      - ../../.postgres_auth.env
     logging:
       driver: none
   redis:

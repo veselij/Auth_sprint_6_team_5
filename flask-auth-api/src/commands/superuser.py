@@ -84,10 +84,13 @@ def create_superuser():
     help="If True interactive prompt will be used, if False Username and password will be loaded from env variables",
 )
 def create_superuser_command(interactive):
-    if interactive:
-        create_superuser_int()
-    else:
-        create_superuser()
+    try:
+        if interactive:
+            create_superuser_int()
+        else:
+            create_superuser()
+    except InvalidUserDataError as e:
+        print(e.message)
 
 
 @superuser_cli.command("reset-password")
