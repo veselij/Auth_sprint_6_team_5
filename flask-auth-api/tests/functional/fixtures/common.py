@@ -110,14 +110,11 @@ def prepare_user(make_post_request):
         await make_post_request(url=f"{url}/register", data=user_data)
 
         response = await make_post_request(url=f"{url}/login", data=user_data)
-        request_id = response.body["request_id"]
 
-        totp_url = url.replace("users", "totp")
-        response = await make_post_request(url=f"{totp_url}/check/{request_id}", data={"code": "1234"})
-        refresh_token = response.body["refresh_token"]
+        refresh_token = response.body["token"]["refresh_token"]
         headers_refresh = {"Authorization": f"Bearer {refresh_token}"}
 
-        access_token = response.body["access_token"]
+        access_token = response.body["token"]["access_token"]
         headers_access = {"Authorization": f"Bearer {access_token}"}
 
         uuid = jwt.decode(refresh_token, options={"verify_signature": False})["sub"]

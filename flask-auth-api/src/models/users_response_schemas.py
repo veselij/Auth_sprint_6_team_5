@@ -29,13 +29,8 @@ class TokenSchema(Schema):
     refresh_token = fields.Str(required=True)
 
 
-class RequestIdSchema(Schema):
-    request_id = fields.Str(required=True)
-    totp_active = fields.Bool()
-
-
 class SocialTokenSchema(TokenSchema):
-    required_fields = fields.List(fields.Str())
+    required_fields = fields.List(fields.Str(), required=True)
 
 
 class AllDevicesSchema(Schema):
@@ -59,15 +54,9 @@ class UserHistorySchema(Schema):
 
 
 class PaginationSchema(Schema):
-    page_num = fields.Int(
-        validate=Range(
-            DefaultPaginator.min_page_num.value, DefaultPaginator.max_page_num.value
-        )
-    )
+    page_num = fields.Int(validate=Range(DefaultPaginator.min_page_num.value, DefaultPaginator.max_page_num.value))
     page_items = fields.Int(
-        validate=Range(
-            DefaultPaginator.min_page_items.value, DefaultPaginator.max_page_items.value
-        ),
+        validate=Range(DefaultPaginator.min_page_items.value, DefaultPaginator.max_page_items.value),
     )
 
 
@@ -91,9 +80,7 @@ class CheckAccessTokenSchema(Schema):
 
 
 class ProvidersSchema(Schema):
-    provider = fields.Str(
-        required=True, validate=OneOf([field.name for field in Providers])
-    )
+    provider = fields.Str(required=True, validate=OneOf([field.name for field in Providers]))
 
 
 class TotpCodeSchema(Schema):
@@ -102,3 +89,12 @@ class TotpCodeSchema(Schema):
 
 class ProvisioningUrlSchema(Schema):
     url = fields.Str(required=True)
+
+
+class RequestSchema(Schema):
+    request_id = fields.Str(required=True)
+
+
+class RequestIdSchema(RequestSchema):
+    totp_active = fields.Bool(required=True)
+    token = fields.Nested(SocialTokenSchema, required=True)

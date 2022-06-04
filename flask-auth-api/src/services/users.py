@@ -6,6 +6,7 @@ from typing import NamedTuple, Optional
 
 from flask import request
 from flask_jwt_extended import decode_token
+from flask_jwt_extended.utils import get_jti
 from sqlalchemy import extract
 from sqlalchemy.dialects.postgresql.base import UUID
 
@@ -21,6 +22,7 @@ from utils.exceptions import (
     ObjectDoesNotExistError,
 )
 from utils.password_hashing import generate_random_string, get_password_hash
+from utils.tokens import Token, get_token
 from utils.view_decorators import check_revoked_token
 
 
@@ -33,6 +35,7 @@ class UserRandomFields:
 class RequestId(NamedTuple):
     request_id: str
     totp_active: bool
+    token: Optional[Token]
 
 
 class UserService:
@@ -72,16 +75,23 @@ class UserService:
         self.log_login_attempt(user.id, True, request_id)
         return self.generate_request_id(user, request_id)
 
-    def generate_request_id(
-        self, user: User, request_id: str, required_fields: Optional[list] = None
-    ) -> RequestId:
+    def put_user_data_to_cache(self, user: User, request_id: str, required_fields: list) -> None:
         user_data = user.to_dict()
-        user_data["required_fields"] = required_fields or []
+        user_data["required_fields"] = required_fields
         user_data["roles"] = self.get_user_roles(user.id)
-        self.cache.request_cache.set_value(
-            request_id, json.dumps(user_data), config.request_ttl
-        )
-        return RequestId(request_id, user.totp_active)
+        self.cache.request_cache.set_value(request_id, json.dumps(user_data), config.request_ttl)
+
+    def generate_request_id(self, user: User, request_id: str, required_fields: Optional[list] = None) -> RequestId:
+        if user.totp_active:
+            token = None
+            required_fields = required_fields or []
+            self.put_user_data_to_cache(user, request_id, required_fields)
+        else:
+            token = get_token(user.id, user.is_superuser, self.get_user_roles(user.id), [])
+            self.cache.refresh_cache.set_value(
+                name=str(get_jti(token.refresh_token)), value=str(user.id), ex=config.refresh_ttl
+            )
+        return RequestId(request_id=request_id, totp_active=user.totp_active, token=token)
 
     def revoke_access_token(self, token: dict, user_id: str, all: str) -> None:
         if strtobool(all):
@@ -95,16 +105,12 @@ class UserService:
             data[jti] = value
         else:
             data = {jti: value}
-        self.cache.access_cache.set_value(
-            str(user_id), json.dumps(data), ex=config.refresh_ttl
-        )
+        self.cache.access_cache.set_value(str(user_id), json.dumps(data), ex=config.refresh_ttl)
 
     def update_user_data(self, user: User, fields: dict) -> None:
         if "password" in fields:
             fields["password"] = get_password_hash(fields["password"])
-        if not self.repository.update_obj_in_db(
-            obj=User, fileds_to_update=fields, id=user.id
-        ):
+        if not self.repository.update_obj_in_db(obj=User, fileds_to_update=fields, id=user.id):
             raise ConflictError
 
     def get_user_history(
@@ -120,16 +126,12 @@ class UserService:
     def get_user_history_from_db(
         self, user_id: str, start: int, end: int, year: int, month: int
     ) -> Optional[UserAccessHistory]:
-        user_access_history = self.repository.get_objects_by_field(
-            UserAccessHistory, user_id=user_id
-        )
+        user_access_history = self.repository.get_objects_by_field(UserAccessHistory, user_id=user_id)
         if user_access_history:
             month_user_access_history = user_access_history.filter(
                 extract("month", UserAccessHistory.login_date) == month
             ).filter(extract("year", UserAccessHistory.login_date) == year)
-            return month_user_access_history.order_by(
-                UserAccessHistory.login_date.desc()
-            ).slice(start, end)
+            return month_user_access_history.order_by(UserAccessHistory.login_date.desc()).slice(start, end)
 
     def get_user_roles(self, user_id: str) -> list[Optional[str]]:
         roles = self.repository.get_joined_objects_by_field(Role, User.roles)
@@ -139,20 +141,14 @@ class UserService:
 
     def add_user_roles(self, user_id: str, role_ids: list) -> bool:
         self.revoke_access_token({}, user_id, "true")
-        return self.repository.add_many_to_many_row(
-            User, user_id, Role, role_ids, "roles"
-        )
+        return self.repository.add_many_to_many_row(User, user_id, Role, role_ids, "roles")
 
     def remove_user_roles(self, user_id: str, role_ids: list) -> bool:
         self.revoke_access_token({}, user_id, "true")
-        return self.repository.remove_many_to_many_row(
-            User, user_id, Role, role_ids, "roles"
-        )
+        return self.repository.remove_many_to_many_row(User, user_id, Role, role_ids, "roles")
 
     def check_user_roles(self, access_token: str) -> list:
         token = decode_token(access_token)
-        if not token:
-            raise InvalidTokenError
         if check_revoked_token(token):
             raise InvalidTokenError
         return token["roles"]
@@ -164,9 +160,7 @@ class UserService:
             user = User(**asdict(random_fields))
             user.email = email
             if self.repository.create_obj_in_db(user):
-                return self.repository.get_object_by_field(
-                    User, login=random_fields.login
-                )
+                return self.repository.get_object_by_field(User, login=random_fields.login)
             attempts -= 1
         return
 
@@ -204,7 +198,5 @@ class UserService:
     def delete_social_account(self, token: dict, provider: str) -> None:
         user_id = str(token["sub"])
         self.revoke_access_token(token, user_id, "true")
-        if not self.repository.delete_object_by_field(
-            SocialAccount, user_id=user_id, social_name=provider
-        ):
+        if not self.repository.delete_object_by_field(SocialAccount, user_id=user_id, social_name=provider):
             raise ObjectDoesNotExistError

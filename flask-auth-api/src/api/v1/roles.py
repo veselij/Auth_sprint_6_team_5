@@ -194,15 +194,17 @@ class CheckUserRole(CustomSwaggerView):
     responses = {
         HTTPStatus.OK.value: {
             "description": HTTPStatus.OK.phrase,
-            "content": {"application/json": {"schema": UserRoleSchema, "example": Msg.ok.value}},
+            "content": {
+                "application/json": {"schema": {"type": "array", "format": "string"}, "example": ["role1", "role2"]}
+            },
         },
         HTTPStatus.UNAUTHORIZED.value: {
             "description": HTTPStatus.UNAUTHORIZED.phrase,
             "content": {"application/json": {"schema": MsgSchema, "example": Msg.unauthorized.value}},
         },
-        HTTPStatus.FORBIDDEN.value: {
+        HTTPStatus.UNPROCESSABLE_ENTITY.value: {
             "description": HTTPStatus.FORBIDDEN.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": Msg.forbidden.value}},
+            "content": {"application/json": {"schema": MsgSchema}},
         },
     }
 
@@ -213,9 +215,9 @@ class CheckUserRole(CustomSwaggerView):
         try:
             roles = user_service.check_user_roles(self.validated_body["access_token"])
         except InvalidTokenError:
-            return make_response(jsonify(UserRoleSchema().load({"role_id": []})), HTTPStatus.OK.value)
+            return make_response(jsonify(MsgSchema().load(Msg.unauthorized.value), HTTPStatus.UNAUTHORIZED.value))
 
-        return make_response(jsonify(UserRoleSchema().load({"role_id": roles})), HTTPStatus.OK.value)
+        return make_response(jsonify(roles), HTTPStatus.OK.value)
 
 
 bp.add_url_rule("/", view_func=Role.as_view("role"), methods=["POST", "GET"])

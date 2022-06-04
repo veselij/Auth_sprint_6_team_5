@@ -227,10 +227,7 @@ async def test_delete_social_user_with_token(
     assert response.status == HTTPStatus.OK
 
     # prepare access token
-    request_id = response.body["request_id"]
-    totp_url = url.replace("users", "totp")
-    response = await make_post_request(url=f"{totp_url}/check/{request_id}", data={"code": "1234"})
-    access_token = response.body["access_token"]
+    access_token = response.body["token"]["access_token"]
     headers_access = {"Authorization": f"Bearer {access_token}"}
 
     # delete yandex user
@@ -239,18 +236,13 @@ async def test_delete_social_user_with_token(
 
 
 @pytest.mark.asyncio
-async def test_add_totp(make_post_request, clear_db_tables, clear_redis, make_get_request, get_from_redis):
+async def test_add_totp(prepare_user, make_post_request, clear_db_tables, clear_redis, make_get_request, get_from_redis):
 
-    # register
-    await make_post_request(url=f"{url}/register", data=user_data[0][0])
-
-    # login
-    response = await make_post_request(url=f"{url}/login", data=user_data[0][0])
-    assert response.status == HTTPStatus.OK
-    request_id = response.body["request_id"]
+    # register user and get token
+    headers_access, headers_refresh, uuid = await prepare_user(url, user_data[0][0])
 
     # add totp
-    response = await make_get_request(url=f"{totp_url}/sync/{request_id}")
+    response = await make_get_request(url=f"{totp_url}/sync", headers=headers_access)
     assert response.status == HTTPStatus.CREATED
 
     # prepare code
@@ -259,14 +251,14 @@ async def test_add_totp(make_post_request, clear_db_tables, clear_redis, make_ge
     code = str(p.now())
 
     # confirm code
-    response = await make_post_request(url=f"{totp_url}/sync/{request_id}", data={"code": code})
-    assert response.status == HTTPStatus.CREATED
-    assert await check_tokens(response, get_from_redis)
+    response = await make_post_request(url=f"{totp_url}/sync", headers=headers_access, data={"code": code})
+    assert response.status == HTTPStatus.OK
 
     # login
     response = await make_post_request(url=f"{url}/login", data=user_data[0][0])
     assert response.status == HTTPStatus.OK
     request_id = response.body["request_id"]
+    assert response.body["token"] == None
 
     response = await make_post_request(url=f"{totp_url}/check/{request_id}", data={"code": "123"})
     assert response.status == HTTPStatus.UNAUTHORIZED
@@ -274,3 +266,4 @@ async def test_add_totp(make_post_request, clear_db_tables, clear_redis, make_ge
     code = str(p.now())
     response = await make_post_request(url=f"{totp_url}/check/{request_id}", data={"code": code})
     assert response.status == HTTPStatus.CREATED
+    assert response.body["access_token"] != None

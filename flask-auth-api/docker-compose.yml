@@ -7,9 +7,11 @@ services:
     networks:
       - backend_nw
     volumes:
-      - pg_data:/var/lib/postgresql/data
+      - pg_data_auth:/var/lib/postgresql/data
     env_file:
       - ./.postgres_auth.env
+    ports:
+      - 5432:5432
   nginx:
     image: nginx:1.21.6
     container_name: nginx_auth
@@ -30,8 +32,8 @@ services:
       - backend_nw
     volumes:
       - redis_data:/data
-    expose:
-      - 6379
+    ports:
+      - 6379:6379
   auth:
     container_name: auth
     build:
@@ -40,13 +42,13 @@ services:
     networks:
       - backend_nw
     volumes:
-      - code_api:/code
+      - code_api_auth:/code
     env_file:
       - .auth.env
     entrypoint: 
       - entrypoint.sh
-    expose:
-      - 8001
+    ports:
+      - 8001:8001
     depends_on:
       - db
       - redis
@@ -64,8 +66,8 @@ services:
 
 volumes:
   code:
-  code_api:
-  pg_data:
+  code_api_auth:
+  pg_data_auth:
   redis_data:
 
 networks:

@@ -1,7 +1,7 @@
 from contextlib import AbstractContextManager
 from typing import Callable, Optional
 
-from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.exc import DataError, IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 
@@ -131,7 +131,10 @@ class Repositiry:
                     session.rollback()
                     return False
                 for related_value in related_values:
-                    r_obj = session.query(related_obj).filter_by(id=related_value).one_or_none()
+                    try:
+                        r_obj = session.query(related_obj).filter_by(id=related_value).one_or_none()
+                    except DataError:
+                        continue
                     if not r_obj:
                         session.rollback()
                         return False
