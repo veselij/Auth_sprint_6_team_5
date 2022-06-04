@@ -28,7 +28,7 @@ def rate_limiting(requests_limit: int = 10, limit_expire_period: int = 60):
         @wraps(func)
         def inner(*args, **kwargs):
             if requests_is_limited(request_limit=requests_limit, limit_key_expire_period=limit_expire_period):
-                make_response(jsonify(MsgSchema().load(Msg.rate_limit.value)), HTTPStatus.TOO_MANY_REQUESTS.value)
+                return make_response(jsonify(MsgSchema().load(Msg.rate_limit.value)), HTTPStatus.TOO_MANY_REQUESTS.value)
             func(*args, **kwargs)
             return
         return inner
