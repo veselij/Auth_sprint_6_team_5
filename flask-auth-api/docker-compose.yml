@@ -3,19 +3,20 @@ version: '3.0'
 services:
   db:
     image: postgres:13
-    container_name: pg_server
+    container_name: pg_server_auth
     networks:
       - backend_nw
     volumes:
       - pg_data:/var/lib/postgresql/data
     env_file:
-      - ./.postgres.env
+      - ./.postgres_auth.env
   nginx:
     image: nginx:1.21.6
+    container_name: nginx_auth
     depends_on:
       - auth
     ports:
-      - 80:80
+      - 82:82
     networks:
       - backend_nw
     volumes:
@@ -45,10 +46,21 @@ services:
     entrypoint: 
       - entrypoint.sh
     expose:
-      - 8000
+      - 8001
     depends_on:
       - db
       - redis
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: auth_jaeger_tracing
+    ports:
+      - 6831:6831/udp
+      - 16686:16686/tcp
+    networks:
+      - backend_nw
+    depends_on:
+      - nginx
+
 
 volumes:
   code:
