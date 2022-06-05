@@ -22,8 +22,8 @@ from utils.exceptions import (
     ObjectDoesNotExistError,
 )
 from utils.password_hashing import generate_random_string, get_password_hash
-from utils.tracing import tracing
 from utils.tokens import Token, get_token
+from utils.tracing import tracing
 from utils.view_decorators import check_revoked_token
 
 

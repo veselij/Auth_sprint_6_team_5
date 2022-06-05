@@ -2,9 +2,8 @@ from dataclasses import dataclass
 from http import HTTPStatus
 
 import jwt
-import pytest
 import pyotp
-
+import pytest
 from settings import config
 from testdata.users import update_user_data, user_data, user_login
 
@@ -236,7 +235,9 @@ async def test_delete_social_user_with_token(
 
 
 @pytest.mark.asyncio
-async def test_add_totp(prepare_user, make_post_request, clear_db_tables, clear_redis, make_get_request, get_from_redis):
+async def test_add_totp(
+    prepare_user, make_post_request, clear_db_tables, clear_redis, make_get_request, get_from_redis
+):
 
     # register user and get token
     headers_access, headers_refresh, uuid = await prepare_user(url, user_data[0][0])
@@ -278,5 +279,3 @@ async def test_register_rate_limitter(make_post_request, clear_db_tables, clear_
         assert response.status != HTTPStatus.TOO_MANY_REQUESTS
     response = await make_post_request(url=f"{url}/register", data=user_data[0][0])
     assert response.status == HTTPStatus.TOO_MANY_REQUESTS
-
-

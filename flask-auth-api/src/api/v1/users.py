@@ -34,8 +34,8 @@ from utils.exceptions import (
     ObjectDoesNotExistError,
     ProviderAuthTokenError,
 )
-from utils.tracing import tracing
 from utils.rate_limit import rate_limiting
+from utils.tracing import tracing
 from utils.view_decorators import jwt_verification, revoked_token_check
 
 bp = Blueprint("users", __name__, url_prefix="/api/v1/users")

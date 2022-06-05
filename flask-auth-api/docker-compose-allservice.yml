@@ -54,8 +54,8 @@ services:
       - backend_nw
     environment:
       - discovery.type=single-node
-    ports:
-      - 9200:9200
+    expose:
+      - 9200
     volumes:
       - esdata:/usr/share/elasticsearch/data:rw
   etl_service:
@@ -77,8 +77,8 @@ services:
       - backend_nw
     volumes:
       - redis_data:/data
-    ports:
-      - 6379:6379
+    expose:
+      - 6379
   fastapi:
     build: https://github.com/veselij/Async_API_sprint_1_team5.git#main
     container_name: fastapi
@@ -103,7 +103,7 @@ services:
     volumes:
       - code_api_auth:/code
     env_file:
-      - .auth.env
+      - .auth_all.env
     entrypoint: 
       - entrypoint.sh
     expose:

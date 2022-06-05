@@ -1,7 +1,6 @@
 import psycopg2
 import pytest
 from psycopg2.extras import DictCursor
-
 from settings import config
 
 

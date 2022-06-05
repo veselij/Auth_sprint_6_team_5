@@ -13,6 +13,7 @@ from core.config import SWAGGER_TEMPLATE, config
 from social.oauth import oauth
 from utils.tracing import configure_tracing
 
+
 def create_app() -> Flask:
     container = Container()
     app = Flask(__name__)
