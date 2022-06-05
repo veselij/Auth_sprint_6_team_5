@@ -3,15 +3,18 @@ from functools import wraps
 from flask import request
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 from opentelemetry.instrumentation.flask import FlaskInstrumentor
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
 from opentelemetry.exporter.jaeger.thrift import JaegerExporter
+
+from core.config import config
 
 
 def configure_tracing(app):
 
     @app.before_request
-    def before_request():
+    def before_request() -> None:
         request_id = request.headers.get('X-Request-Id')
         user_ip = request.headers.get('X-Real-IP')
         if not request_id:
@@ -20,17 +23,17 @@ def configure_tracing(app):
             raise RuntimeError('real ip is required')
 
     def configure_tracer() -> None:
-        trace.set_tracer_provider(TracerProvider())
+        trace.set_tracer_provider(TracerProvider(resource=Resource.create({SERVICE_NAME: "Auth-service"})))
         trace.get_tracer_provider().add_span_processor(
             BatchSpanProcessor(
                 JaegerExporter(
-                    agent_host_name='localhost',
+                    agent_host_name=config.jager_host,
                     agent_port=6831,
                 )
             )
         )
-        # Чтобы видеть трейсы в консоли
-        trace.get_tracer_provider().add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
+        if config.test:
+            trace.get_tracer_provider().add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
 
     configure_tracer()
     FlaskInstrumentor().instrument_app(app)

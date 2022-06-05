@@ -37,6 +37,8 @@ class ConfigSettings(BaseSettings):
 
     request_ttl: int = Field(60, env="REQUEST_TTL")
 
+    jager_host: str = Field("127.0.0.1", env="JAGER_HOST")
+
 
 config = ConfigSettings()
 

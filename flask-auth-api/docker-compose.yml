@@ -24,7 +24,7 @@ services:
     volumes:
       - code:/data:ro
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/configs:/etc/nginx/conf.d/:ro
+      - ./nginx/configs/auth.conf:/etc/nginx/conf.d/auth.conf:ro
   redis:
     image: redis:6.2.6
     container_name: redis
