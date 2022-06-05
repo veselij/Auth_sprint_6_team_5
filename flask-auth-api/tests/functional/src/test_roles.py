@@ -2,7 +2,6 @@ from http import HTTPStatus
 from time import sleep
 
 import pytest
-
 from settings import config
 from testdata.roles import role_data, update_role_data
 from testdata.users import user_data
@@ -249,7 +248,9 @@ async def test_delete_user_role_not_exist(
     assert response.status == HTTPStatus.OK
 
     # delete not exising role by superuser from normal user
-    response = await make_delete_request(url=f"{url}/user/{uuid}", headers=headers_access, data={"role_id": ["0774bba8-e050-40d0-a490-2a1c6fe33472"]})
+    response = await make_delete_request(
+        url=f"{url}/user/{uuid}", headers=headers_access, data={"role_id": ["0774bba8-e050-40d0-a490-2a1c6fe33472"]}
+    )
     assert response.status == HTTPStatus.NOT_FOUND
 
 

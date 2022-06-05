@@ -33,16 +33,14 @@ services:
     volumes:
       - code_api:/code
     env_file:
-      - ../../.auth.env
+      - .auth.env
     entrypoint:
       - entrypoint.sh
     expose:
-      - 8000
+      - 8001
     depends_on:
       - redis
       - db
-    logging:
-      driver: none
   tests:
     container_name: auth_test
     build:
@@ -50,7 +48,7 @@ services:
     volumes:
       - code_test:/code_test
     env_file:
-      - ../../.auth.env
+      - .auth.env
     networks:
       - backend_nw
 

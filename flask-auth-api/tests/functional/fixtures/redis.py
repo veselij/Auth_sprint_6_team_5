@@ -1,6 +1,5 @@
 import aioredis
 import pytest_asyncio
-
 from settings import config
 
 

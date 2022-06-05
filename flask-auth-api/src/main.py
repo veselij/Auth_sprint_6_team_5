@@ -11,6 +11,7 @@ from commands.superuser import superuser_cli
 from containers.container import Container
 from core.config import SWAGGER_TEMPLATE, config
 from social.oauth import oauth
+from utils.tracing import configure_tracing
 
 
 def create_app() -> Flask:
@@ -31,6 +32,8 @@ def create_app() -> Flask:
 
     app.config["SWAGGER"] = {"title": config.api_name, "uiversion": config.uiversion, "openapi": config.openapi}
     swag = Swagger(app, template=SWAGGER_TEMPLATE)
+    if config.jager_status:
+        configure_tracing(app)
 
     return app
 

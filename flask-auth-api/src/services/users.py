@@ -23,6 +23,7 @@ from utils.exceptions import (
 )
 from utils.password_hashing import generate_random_string, get_password_hash
 from utils.tokens import Token, get_token
+from utils.tracing import tracing
 from utils.view_decorators import check_revoked_token
 
 
@@ -43,6 +44,7 @@ class UserService:
         self.repository = repository
         self.cache = cache
 
+    @tracing
     def create_user(self, username: str, password: str) -> bool:
         user = User(login=username, password=get_password_hash(password))
         return self.repository.create_obj_in_db(user)

@@ -9,3 +9,4 @@ class Msg(Enum):
     not_found = {"msg": "Object not found"}
     alredy_exists = {"msg": "Object already exists"}
     forbidden = {"msg": "Token invalid"}
+    rate_limit = {"msg": "Too Many Requests"}
