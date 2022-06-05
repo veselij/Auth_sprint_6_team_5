@@ -35,13 +35,14 @@ from utils.exceptions import (
     ProviderAuthTokenError,
 )
 from utils.tracing import tracing
+from utils.rate_limit import rate_limiting
 from utils.view_decorators import jwt_verification, revoked_token_check
 
 bp = Blueprint("users", __name__, url_prefix="/api/v1/users")
 
 
 class RegistrationView(CustomSwaggerView):
-    decorators = [tracing]
+    decorators = [rate_limiting(), tracing]
 
     tags = ["users"]
     requestBody = {
@@ -59,6 +60,10 @@ class RegistrationView(CustomSwaggerView):
         HTTPStatus.CONFLICT.value: {
             "description": HTTPStatus.CONFLICT.phrase,
             "content": {"application/json": {"schema": MsgSchema, "example": Msg.alredy_exists.value}},
+        },
+        HTTPStatus.TOO_MANY_REQUESTS.value: {
+            "description": HTTPStatus.TOO_MANY_REQUESTS.phrase,
+            "content": {"application/json": {"schema": MsgSchema, "example": Msg.rate_limit.value}},
         },
     }
 
