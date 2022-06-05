@@ -45,8 +45,8 @@ def tracing(func):
         request_id = request.headers.get('X-Request-Id')
         tracer = trace.get_tracer(__name__)
         span = tracer.start_span(func.__name__)
-        func(*args, **kwargs)
+        result = func(*args, **kwargs)
         span.set_attribute('http.request_id', request_id)
         span.end()
-        return
+        return result
     return inner
