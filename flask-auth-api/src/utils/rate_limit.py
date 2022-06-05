@@ -16,11 +16,11 @@ from models.users_response_schemas import MsgSchema
 from utils.exceptions import RetryExceptionError
 
 REDIS_CONN = Redis(connection_pool=ConnectionPool(host=config.redis_host, port=config.redis_port, db=5))
-REQUEST_LIMIT = 10
+REQUEST_LIMIT = 20
 LIMIT_KEY_EXPIRE_PERIOD = 60
 
 
-def rate_limiting(requests_limit: int = 10, limit_expire_period: int = 60):
+def rate_limiting(requests_limit: int = 20, limit_expire_period: int = 60):
     """Limit requests per received limit period.
 
         Args:

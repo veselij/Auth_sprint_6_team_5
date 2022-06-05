@@ -267,3 +267,16 @@ async def test_add_totp(prepare_user, make_post_request, clear_db_tables, clear_
     response = await make_post_request(url=f"{totp_url}/check/{request_id}", data={"code": code})
     assert response.status == HTTPStatus.CREATED
     assert response.body["access_token"] != None
+
+
+@pytest.mark.asyncio
+async def test_register_rate_limitter(make_post_request, clear_db_tables, clear_redis):
+
+    # register user
+    for _ in range(20):
+        response = await make_post_request(url=f"{url}/register", data=user_data[0][0])
+        assert response.status != HTTPStatus.TOO_MANY_REQUESTS
+    response = await make_post_request(url=f"{url}/register", data=user_data[0][0])
+    assert response.status == HTTPStatus.TOO_MANY_REQUESTS
+
+
