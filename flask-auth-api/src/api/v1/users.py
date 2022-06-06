@@ -6,7 +6,7 @@ from dependency_injector.wiring import Provide, inject
 from flask import Blueprint, abort, jsonify, make_response, url_for
 from flask.views import MethodView
 from flask.wrappers import Response
-from flask_jwt_extended import get_jwt, jwt_required
+from flask_jwt_extended import get_jti, get_jwt, jwt_required
 
 from api.v1.common_view import CustomSwaggerView
 from containers.container import Container
@@ -24,7 +24,13 @@ from models.users_response_schemas import (
     UserUUIDSchema,
 )
 from services.request import RequestService
-from services.users import UserService
+from services.users import (
+    BaseUserService,
+    HistoryUserService,
+    ManageSocialUserService,
+    ManageUserService,
+    RoleUserService,
+)
 from social.oauth import oauth
 from social.providers import Providers
 from social.userdata import user_data_registry
@@ -68,7 +74,7 @@ class RegistrationView(CustomSwaggerView):
     }
 
     @inject
-    def post(self, user_service: UserService = Provide[Container.user_service]) -> Response:
+    def post(self, user_service: ManageUserService = Provide[Container.manage_user_service]) -> Response:
         self.validate_body(AuthSchema)
 
         created = user_service.create_user(self.validated_body["login"], self.validated_body["password"])
@@ -99,7 +105,7 @@ class LoginView(CustomSwaggerView):
     }
 
     @inject
-    def post(self, user_service: UserService = Provide[Container.user_service]) -> Response:
+    def post(self, user_service: ManageUserService = Provide[Container.manage_user_service]) -> Response:
         self.validate_body(AuthSchema)
 
         try:
@@ -136,7 +142,7 @@ class RefreshView(CustomSwaggerView):
         self,
         user_id: UUID,
         request_service: RequestService = Provide[Container.request_service],
-        user_service: UserService = Provide[Container.user_service],
+        user_service: BaseUserService = Provide[Container.base_user_service],
     ) -> Response:
         user = str(user_id)
         self.validate_path(UserUUIDSchema)
@@ -175,12 +181,15 @@ class LogoutView(CustomSwaggerView):
     }
 
     @inject
-    def get(self, user_id: str, user_service: UserService = Provide[Container.user_service]) -> Response:
+    def get(self, user_id: str, user_service: BaseUserService = Provide[Container.base_user_service]) -> Response:
         self.validate_path(UserUUIDSchema)
         self.validate_query(AllDevicesSchema)
 
-        token = get_jwt()
-        user_service.revoke_access_token(token, user_id, self.validated_query["all_devices"])
+        if self.validated_query["all_devices"] == "true":
+            user_service.revoke_access_token(user_id)
+        else:
+            jti = get_jwt()["jti"]
+            user_service.revoke_access_token(user_id, jti)
         return make_response(jsonify(MsgSchema().load(Msg.ok.value)), HTTPStatus.OK.value)
 
 
@@ -214,7 +223,7 @@ class ChangeUserView(CustomSwaggerView):
     }
 
     @inject
-    def put(self, user_id: str, user_service: UserService = Provide[Container.user_service]) -> Response:
+    def put(self, user_id: str, user_service: ManageUserService = Provide[Container.manage_user_service]) -> Response:
         self.validate_body(AuthSchema)
         self.validate_path(UserUUIDSchema)
 
@@ -293,7 +302,7 @@ class UserHistoryView(CustomSwaggerView):
     }
 
     @inject
-    def get(self, user_id: str, user_service: UserService = Provide[Container.user_service]) -> Response:
+    def get(self, user_id: str, user_service: HistoryUserService = Provide[Container.history_user_service ]) -> Response:
         self.validate_path(UserUUIDSchema)
         self.validate_query(UserHistoryQuerySchema)
 
@@ -334,7 +343,7 @@ class SocialLoginView(CustomSwaggerView):
     }
 
     @inject
-    def get(self, provider: str, user_service: UserService = Provide[Container.user_service]) -> Response:
+    def get(self, provider: str, user_service: ManageSocialUserService = Provide[Container.manage_social_user_service ]) -> Response:
         self.validate_path(ProvidersSchema)
         client = oauth.create_client(provider)
 
@@ -397,7 +406,7 @@ class DeleteSocialAccountView(CustomSwaggerView):
     }
 
     @inject
-    def delete(self, provider: str, user_service: UserService = Provide[Container.user_service]) -> Response:
+    def delete(self, provider: str, user_service: ManageSocialUserService = Provide[Container.manage_social_user_service]) -> Response:
         self.validate_path(ProvidersSchema)
 
         token = get_jwt()

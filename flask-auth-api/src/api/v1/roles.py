@@ -18,7 +18,7 @@ from models.users_response_schemas import (
     UserUUIDSchema,
 )
 from services.roles import RoleService
-from services.users import UserService
+from services.users import RoleUserService
 from utils.exceptions import InvalidTokenError
 from utils.view_decorators import jwt_verification, revoked_token_check
 
@@ -159,7 +159,7 @@ class UserRoles(CustomSwaggerView):
     }
 
     @inject
-    def post(self, user_id: str, user_service: UserService = Provide[Container.user_service]) -> Response:
+    def post(self, user_id: str, user_service: RoleUserService = Provide[Container.role_user_service]) -> Response:
         self.validate_path(UserUUIDSchema)
         self.validate_body(UserRoleSchema)
 
@@ -170,7 +170,7 @@ class UserRoles(CustomSwaggerView):
         return make_response(jsonify(MsgSchema().load(Msg.ok.value)), HTTPStatus.OK.value)
 
     @inject
-    def delete(self, user_id: str, user_service: UserService = Provide[Container.user_service]) -> Response:
+    def delete(self, user_id: str, user_service: RoleUserService = Provide[Container.role_user_service]) -> Response:
         self.validate_path(UserUUIDSchema)
         self.validate_body(UserRoleSchema)
 
@@ -209,7 +209,7 @@ class CheckUserRole(CustomSwaggerView):
     }
 
     @inject
-    def post(self, user_service: UserService = Provide[Container.user_service]) -> Response:
+    def post(self, user_service: RoleUserService = Provide[Container.role_user_service]) -> Response:
         self.validate_body(CheckAccessTokenSchema)
 
         try:

@@ -4,7 +4,7 @@ sequenceDiagram
 	participant S as Auth Server
 	participant P as Provider
 	Note over C, S: registration
-	C->>S: https://x.x.x.x/users/register/social?provider=Enum[]
+	C->>S: https://x.x.x.x/users/register/social/provider
 	S->>S: chouse right provider
 	S->>S: check jwt signature
 	S-->>C: 401 Unauthorized
@@ -14,7 +14,7 @@ sequenceDiagram
 	S->>C: OK(200)
 ```
 
-**Path**: /users/register/social?provider=Enum[]  
+**Path**: /users/register/social/provider
 **Type**: DELETE 
 **Body**: None  
 **Response Body**

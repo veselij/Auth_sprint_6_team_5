@@ -9,9 +9,9 @@ sequenceDiagram
 	S->>S: Authentication
 	Note right of S: check hash(passwd) with passwd in DB (using dynamic salt)
 	S-->>C: 401 Unauthorized
-	S->>S: generate request_id
-	S->>R: store in db2 request_id: user_id
-	S->>C: OK(200) (request_id)
+	S->>S: check if TOTP active
+	S->>S: generate response
+	S->>C: OK(200) (response)
 ```
 
 **Path**: /users/login
@@ -26,6 +26,14 @@ sequenceDiagram
 **Response Body**:  
 ```
 {
-	"request_id": "",
+  "request_id": "string",
+  "token": {
+    "access_token": "string",
+    "refresh_token": "string",
+    "required_fields": [
+      "string"
+    ]
+  },
+  "totp_active": true
 }  
 ```
