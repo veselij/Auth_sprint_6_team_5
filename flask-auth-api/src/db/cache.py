@@ -15,7 +15,7 @@ class Cache(Protocol):
     def set(self, name: str, value: str, ex: int) -> Optional[bool]:
         ...
 
-    def delete(self, *names: str) -> Optional[int]:
+    def delete(self, *names: str) -> int:
         ...
 
 
@@ -43,7 +43,7 @@ class CacheManager:
 
     backoff(logger, start_sleep_time=0.1, factor=2, border_sleep_time=10)
 
-    def delete_value(self, name: str) -> Optional[bool]:
+    def delete_value(self, name: str) -> None:
         try:
             self.cache.delete(name)
         except self.exc:
@@ -57,7 +57,8 @@ class Caches:
         ConnectionError,
     )
     refresh_cache: CacheManager = CacheManager(
-        Redis(connection_pool=ConnectionPool(host=config.redis_host, port=config.redis_port, db=4)), ConnectionError
+        Redis(connection_pool=ConnectionPool(host=config.redis_host, port=config.redis_port, db=4)),
+        ConnectionError,
     )
     request_cache: CacheManager = CacheManager(
         Redis(connection_pool=ConnectionPool(host=config.redis_host, port=config.redis_port, db=5)),

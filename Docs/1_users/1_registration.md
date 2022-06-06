@@ -25,7 +25,7 @@ sequenceDiagram
 **Response Body**
 ```
 {
-"Msg": "Success"
+"Msg": "Object successfully created"
 }
 ```
 ## Can be implemted in future - not done

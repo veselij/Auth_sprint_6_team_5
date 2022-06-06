@@ -4,8 +4,8 @@ sequenceDiagram
 	participant S as Auth Server
 	participant P as Provider
 	Note over C, S: registration
-	C->>S: https://x.x.x.x/users/register/social?provider=Enum[]
-	S->>S: chouse right provider
+	C->>S: https://x.x.x.x/users/register/social/provider
+	S->>S: chouse right provider based on provider value
 	S->>P: redirect to Provider with required scope, code, ids
 	P->>C: request login and password from Provider
 	C->>P: send login, password etc
@@ -21,18 +21,24 @@ sequenceDiagram
 	opt not exists
 	S->>S: create social account and User
 	end
-	S->>S: generate request_id, required_fields
-	S->>R: store in db2 request_id: user_id,required_fields, totp active, totp secret, totp-sync status, is_admin
-	S->>C: OK(200) (request_id)
-	end
+	S->>S: generate response
+	S->>C: CREATED (201) (response)
 ```
 
-**Path**: /users/register/social?provider=Enum[]  
+**Path**: /users/register/social/provider 
 **Type**: Get  
 **Body**: None  
 **Response Body**
 ```
 {
-	"request_id": ""
-}
+  "request_id": "string",
+  "token": {
+    "access_token": "string",
+    "refresh_token": "string",
+    "required_fields": [
+      "string"
+    ]
+  },
+  "totp_active": true
+}  
 ```
