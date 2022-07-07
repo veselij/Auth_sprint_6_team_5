@@ -1,3 +1,4 @@
+import logging
 from datetime import timedelta
 
 from flasgger import Swagger
@@ -17,8 +18,9 @@ from utils.tracing import configure_tracing
 def create_app() -> Flask:
     container = Container()
     app = Flask(__name__)
+    app.logger = logging.getLogger()
     app.secret_key = config.secret
-    app.container = container
+    app.container = container  # type: ignore
     app.config["JWT_SECRET_KEY"] = config.secret
     app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(seconds=config.access_ttl)
     app.config["JWT_REFRESH_TOKEN_EXPIRES"] = timedelta(seconds=config.refresh_ttl)
@@ -30,7 +32,11 @@ def create_app() -> Flask:
     app.register_blueprint(roles_api.bp)
     app.register_blueprint(request_api.bp)
 
-    app.config["SWAGGER"] = {"title": config.api_name, "uiversion": config.uiversion, "openapi": config.openapi}
+    app.config["SWAGGER"] = {
+        "title": config.api_name,
+        "uiversion": config.uiversion,
+        "openapi": config.openapi,
+    }
     swag = Swagger(app, template=SWAGGER_TEMPLATE)
     if config.jager_status:
         configure_tracing(app)

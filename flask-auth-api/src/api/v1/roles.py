@@ -48,7 +48,12 @@ class Role(CustomSwaggerView):
         },
         HTTPStatus.CONFLICT.value: {
             "description": HTTPStatus.CONFLICT.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": Msg.alredy_exists.value}},
+            "content": {
+                "application/json": {
+                    "schema": MsgSchema,
+                    "example": Msg.alredy_exists.value,
+                }
+            },
         },
         HTTPStatus.OK.value: {
             "description": HTTPStatus.OK.phrase,
@@ -58,26 +63,45 @@ class Role(CustomSwaggerView):
         },
         HTTPStatus.UNAUTHORIZED.value: {
             "description": HTTPStatus.UNAUTHORIZED.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": Msg.unauthorized.value}},
+            "content": {
+                "application/json": {
+                    "schema": MsgSchema,
+                    "example": Msg.unauthorized.value,
+                }
+            },
         },
     }
 
     @inject
-    def post(self, role_service: RoleService = Provide[Container.role_service]) -> Response:
+    def post(
+        self, role_service: RoleService = Provide[Container.role_service]
+    ) -> Response:
         self.validate_body(RoleSchema, many=True)
 
         created = role_service.create_roles(self.validated_body)
         if not created:
-            return make_response(jsonify(MsgSchema().load(Msg.alredy_exists.value)), HTTPStatus.CONFLICT.value)
-        return make_response(jsonify(MsgSchema().load(Msg.created.value)), HTTPStatus.CREATED.value)
+            return make_response(
+                jsonify(MsgSchema().load(Msg.alredy_exists.value)),
+                HTTPStatus.CONFLICT.value,
+            )
+        return make_response(
+            jsonify(MsgSchema().load(Msg.created.value)), HTTPStatus.CREATED.value
+        )
 
     @inject
-    def get(self, role_service: RoleService = Provide[Container.role_service]) -> Response:
+    def get(
+        self, role_service: RoleService = Provide[Container.role_service]
+    ) -> Response:
 
         roles = role_service.get_roles()
         if not roles:
-            return make_response(jsonify(MsgSchema().load(Msg.not_found.value)), HTTPStatus.NOT_FOUND.value)
-        return make_response(jsonify(RoleSchema(many=True).dump(roles)), HTTPStatus.OK.value)
+            return make_response(
+                jsonify(MsgSchema().load(Msg.not_found.value)),
+                HTTPStatus.NOT_FOUND.value,
+            )
+        return make_response(
+            jsonify(RoleSchema(many=True).dump(roles)), HTTPStatus.OK.value
+        )
 
 
 class ModifyRole(CustomSwaggerView):
@@ -87,46 +111,80 @@ class ModifyRole(CustomSwaggerView):
 
     requestBody = {
         "content": {
-            "application/json": {"schema": RoleSchema, "example": {"role": "role1", "description": "role description"}},
+            "application/json": {
+                "schema": RoleSchema,
+                "example": {"role": "role1", "description": "role description"},
+            },
         },
     }
     parameters = [
-        {"in": "path", "name": "role_id", "schema": {"type": "string", "format": "uuid"}, "required": True},
+        {
+            "in": "path",
+            "name": "role_id",
+            "schema": {"type": "string", "format": "uuid"},
+            "required": True,
+        },
     ]
 
     responses = {
         HTTPStatus.OK.value: {
             "description": HTTPStatus.OK.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": Msg.ok.value}},
+            "content": {
+                "application/json": {"schema": MsgSchema, "example": Msg.ok.value}
+            },
         },
         HTTPStatus.UNAUTHORIZED.value: {
             "description": HTTPStatus.UNAUTHORIZED.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": Msg.unauthorized.value}},
+            "content": {
+                "application/json": {
+                    "schema": MsgSchema,
+                    "example": Msg.unauthorized.value,
+                }
+            },
         },
         HTTPStatus.NOT_FOUND.value: {
             "description": HTTPStatus.NOT_FOUND.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": Msg.not_found.value}},
+            "content": {
+                "application/json": {
+                    "schema": MsgSchema,
+                    "example": Msg.not_found.value,
+                }
+            },
         },
     }
 
     @inject
-    def delete(self, role_id: str, role_service: RoleService = Provide[Container.role_service]) -> Response:
+    def delete(
+        self, role_id: str, role_service: RoleService = Provide[Container.role_service]
+    ) -> Response:
         self.validate_path(RoleUUIDSchema)
 
         deleted = role_service.delete_role(role_id)
         if not deleted:
-            return make_response(jsonify(MsgSchema().load(Msg.not_found.value)), HTTPStatus.NOT_FOUND.value)
-        return make_response(jsonify(MsgSchema().load(Msg.ok.value)), HTTPStatus.OK.value)
+            return make_response(
+                jsonify(MsgSchema().load(Msg.not_found.value)),
+                HTTPStatus.NOT_FOUND.value,
+            )
+        return make_response(
+            jsonify(MsgSchema().load(Msg.ok.value)), HTTPStatus.OK.value
+        )
 
     @inject
-    def put(self, role_id: str, role_service: RoleService = Provide[Container.role_service]) -> Response:
+    def put(
+        self, role_id: str, role_service: RoleService = Provide[Container.role_service]
+    ) -> Response:
         self.validate_path(RoleUUIDSchema)
         self.validate_body(RoleSchema)
 
         updated = role_service.update_role(str(role_id), self.validated_body)
         if not updated:
-            return make_response(jsonify(MsgSchema().load(Msg.alredy_exists.value)), HTTPStatus.CONFLICT.value)
-        return make_response(jsonify(MsgSchema().load(Msg.ok.value)), HTTPStatus.OK.value)
+            return make_response(
+                jsonify(MsgSchema().load(Msg.alredy_exists.value)),
+                HTTPStatus.CONFLICT.value,
+            )
+        return make_response(
+            jsonify(MsgSchema().load(Msg.ok.value)), HTTPStatus.OK.value
+        )
 
 
 class UserRoles(CustomSwaggerView):
@@ -140,45 +198,82 @@ class UserRoles(CustomSwaggerView):
         },
     }
     parameters = [
-        {"in": "path", "name": "user_id", "schema": {"type": "string", "format": "uuid"}, "required": True},
+        {
+            "in": "path",
+            "name": "user_id",
+            "schema": {"type": "string", "format": "uuid"},
+            "required": True,
+        },
     ]
 
     responses = {
         HTTPStatus.OK.value: {
             "description": HTTPStatus.OK.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": Msg.ok.value}},
+            "content": {
+                "application/json": {"schema": MsgSchema, "example": Msg.ok.value}
+            },
         },
         HTTPStatus.UNAUTHORIZED.value: {
             "description": HTTPStatus.UNAUTHORIZED.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": Msg.unauthorized.value}},
+            "content": {
+                "application/json": {
+                    "schema": MsgSchema,
+                    "example": Msg.unauthorized.value,
+                }
+            },
         },
         HTTPStatus.NOT_FOUND.value: {
             "description": HTTPStatus.NOT_FOUND.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": Msg.not_found.value}},
+            "content": {
+                "application/json": {
+                    "schema": MsgSchema,
+                    "example": Msg.not_found.value,
+                }
+            },
         },
     }
 
     @inject
-    def post(self, user_id: str, user_service: RoleUserService = Provide[Container.role_user_service]) -> Response:
+    def post(
+        self,
+        user_id: str,
+        user_service: RoleUserService = Provide[Container.role_user_service],
+    ) -> Response:
         self.validate_path(UserUUIDSchema)
         self.validate_body(UserRoleSchema)
 
         created = user_service.add_user_roles(user_id, self.validated_body["role_id"])
         if not created:
-            return make_response(jsonify(MsgSchema().load(Msg.not_found.value)), HTTPStatus.NOT_FOUND.value)
+            return make_response(
+                jsonify(MsgSchema().load(Msg.not_found.value)),
+                HTTPStatus.NOT_FOUND.value,
+            )
 
-        return make_response(jsonify(MsgSchema().load(Msg.ok.value)), HTTPStatus.OK.value)
+        return make_response(
+            jsonify(MsgSchema().load(Msg.ok.value)), HTTPStatus.OK.value
+        )
 
     @inject
-    def delete(self, user_id: str, user_service: RoleUserService = Provide[Container.role_user_service]) -> Response:
+    def delete(
+        self,
+        user_id: str,
+        user_service: RoleUserService = Provide[Container.role_user_service],
+    ) -> Response:
         self.validate_path(UserUUIDSchema)
         self.validate_body(UserRoleSchema)
 
-        deleted = user_service.remove_user_roles(user_id, self.validated_body["role_id"])
+        deleted = user_service.remove_user_roles(
+            user_id, self.validated_body["role_id"]
+        )
         if not deleted:
-            return make_response(jsonify(MsgSchema().load(Msg.not_found.value)), HTTPStatus.NOT_FOUND.value)
+            return make_response(
+                jsonify(MsgSchema().load(Msg.not_found.value)),
+                HTTPStatus.NOT_FOUND.value,
+            )
 
-        return make_response(jsonify(MsgSchema().load(Msg.ok.value)), HTTPStatus.OK.value)
+        return make_response(
+            jsonify(MsgSchema().load(Msg.ok.value)), HTTPStatus.OK.value
+        )
 
 
 class CheckUserRole(CustomSwaggerView):
@@ -187,7 +282,10 @@ class CheckUserRole(CustomSwaggerView):
 
     requestBody = {
         "content": {
-            "application/json": {"schema": CheckAccessTokenSchema, "example": {"access_token": ""}},
+            "application/json": {
+                "schema": CheckAccessTokenSchema,
+                "example": {"access_token": ""},
+            },
         },
     }
 
@@ -195,12 +293,20 @@ class CheckUserRole(CustomSwaggerView):
         HTTPStatus.OK.value: {
             "description": HTTPStatus.OK.phrase,
             "content": {
-                "application/json": {"schema": {"type": "array", "format": "string"}, "example": ["role1", "role2"]}
+                "application/json": {
+                    "schema": {"type": "array", "format": "string"},
+                    "example": ["role1", "role2"],
+                }
             },
         },
         HTTPStatus.UNAUTHORIZED.value: {
             "description": HTTPStatus.UNAUTHORIZED.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": Msg.unauthorized.value}},
+            "content": {
+                "application/json": {
+                    "schema": MsgSchema,
+                    "example": Msg.unauthorized.value,
+                }
+            },
         },
         HTTPStatus.UNPROCESSABLE_ENTITY.value: {
             "description": HTTPStatus.FORBIDDEN.phrase,
@@ -209,18 +315,34 @@ class CheckUserRole(CustomSwaggerView):
     }
 
     @inject
-    def post(self, user_service: RoleUserService = Provide[Container.role_user_service]) -> Response:
+    def post(
+        self, user_service: RoleUserService = Provide[Container.role_user_service]
+    ) -> Response:
         self.validate_body(CheckAccessTokenSchema)
-
         try:
             roles = user_service.check_user_roles(self.validated_body["access_token"])
         except InvalidTokenError:
-            return make_response(jsonify(MsgSchema().load(Msg.unauthorized.value), HTTPStatus.UNAUTHORIZED.value))
+            return make_response(
+                jsonify(
+                    MsgSchema().load(Msg.unauthorized.value),
+                    HTTPStatus.UNAUTHORIZED.value,
+                )
+            )
 
         return make_response(jsonify(roles), HTTPStatus.OK.value)
 
 
 bp.add_url_rule("/", view_func=Role.as_view("role"), methods=["POST", "GET"])
-bp.add_url_rule("/<uuid:role_id>", view_func=ModifyRole.as_view("modify_role"), methods=["PUT", "DELETE"])
-bp.add_url_rule("/user/<uuid:user_id>", view_func=UserRoles.as_view("user_role"), methods=["POST", "DELETE"])
-bp.add_url_rule("/user/check", view_func=CheckUserRole.as_view("check_role"), methods=["POST"])
+bp.add_url_rule(
+    "/<uuid:role_id>",
+    view_func=ModifyRole.as_view("modify_role"),
+    methods=["PUT", "DELETE"],
+)
+bp.add_url_rule(
+    "/user/<uuid:user_id>",
+    view_func=UserRoles.as_view("user_role"),
+    methods=["POST", "DELETE"],
+)
+bp.add_url_rule(
+    "/user/check", view_func=CheckUserRole.as_view("check_role"), methods=["POST"]
+)

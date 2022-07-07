@@ -22,7 +22,9 @@ def configure_tracing(app):
             raise RuntimeError("real ip is required")
 
     def configure_tracer() -> None:
-        trace.set_tracer_provider(TracerProvider(resource=Resource.create({SERVICE_NAME: "Auth-service"})))
+        trace.set_tracer_provider(
+            TracerProvider(resource=Resource.create({SERVICE_NAME: "Auth-service"}))
+        )
         trace.get_tracer_provider().add_span_processor(
             BatchSpanProcessor(
                 JaegerExporter(
@@ -32,7 +34,9 @@ def configure_tracing(app):
             )
         )
         if config.test:
-            trace.get_tracer_provider().add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
+            trace.get_tracer_provider().add_span_processor(
+                BatchSpanProcessor(ConsoleSpanExporter())
+            )
 
     configure_tracer()
     FlaskInstrumentor().instrument_app(app)

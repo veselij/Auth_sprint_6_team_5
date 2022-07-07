@@ -14,7 +14,7 @@ echo "Create super user and collectstatic"
 python -m flask superuser create --no-interactive
 
 echo "Start gunicorn server"
-python -m gunicorn --worker-class=gevent --workers=1 --bind 0.0.0.0:$API_IP_PORT wsgi_app:app
+python -m gunicorn --access-logfile '-' --error-logfile '-' --logger-class=core.logging_config.UniformLogger --access-logformat='%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s" request_id %({X-Request-Id}i)s' --worker-class=gevent --workers=1 --bind 0.0.0.0:$API_IP_PORT wsgi_app:app
 
 exec "$@"
 

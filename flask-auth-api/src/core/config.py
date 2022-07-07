@@ -49,12 +49,12 @@ class ConfigSettings(BaseSettings):
     yandex_test_token: str = Field("", env="YANDEX_TEST_TOKEN")
     yandex_test_token_exp: str = Field("", env="YANDEX_TEST_TOKEN_EXP")
 
+    logstash_host: str = Field("logstash", env="LOGSTASH_HOST")
+    logstash_port: int = Field(5044, env="LOGSTASH_PORT")
+
 
 config = ConfigSettings()
 
 
+
 logger = logging.getLogger(__name__)
-formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-fh = logging.FileHandler(filename=config.logs)
-fh.setFormatter(formatter)
-logger.addHandler(fh)
