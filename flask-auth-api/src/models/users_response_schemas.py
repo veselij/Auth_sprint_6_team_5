@@ -98,3 +98,11 @@ class RequestSchema(Schema):
 class RequestIdSchema(RequestSchema):
     totp_active = fields.Bool(required=True)
     token = fields.Nested(SocialTokenSchema, required=True)
+
+
+class UserNotificationInfoSchema(Schema):
+    user_id = fields.UUID()
+    email = fields.Str()
+    email_verified = fields.Bool()
+    notification_policy = fields.Str()
+    timezone = fields.Float()

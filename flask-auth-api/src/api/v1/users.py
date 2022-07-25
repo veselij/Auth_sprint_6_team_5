@@ -21,6 +21,7 @@ from models.users_response_schemas import (
     TokenSchema,
     UserHistoryQuerySchema,
     UserHistorySchema,
+    UserNotificationInfoSchema,
     UserUUIDSchema,
 )
 from services.request import RequestService
@@ -237,6 +238,17 @@ class ChangeUserView(CustomSwaggerView):
             return make_response(jsonify(MsgSchema().load(Msg.alredy_exists.value)), HTTPStatus.CONFLICT.value)
         return make_response(jsonify(MsgSchema().load(Msg.ok.value)), HTTPStatus.OK.value)
 
+    @inject
+    def get(self, user_id: str, user_service: ManageUserService = Provide[Container.manage_user_service]) -> Response:
+        self.validate_body(AuthSchema)
+        self.validate_path(UserUUIDSchema)
+
+        user = user_service.get_user(user_id)
+        if not user:
+            return make_response(jsonify(MsgSchema().load(Msg.not_found.value)), HTTPStatus.NOT_FOUND.value)
+        return make_response(jsonify(UserNotificationInfoSchema(many=True).dump(user)), HTTPStatus.OK.value)
+
+
 
 class UserHistoryView(CustomSwaggerView):
     decorators = [revoked_token_check(), jwt_verification()]
@@ -422,7 +434,7 @@ class DeleteSocialAccountView(CustomSwaggerView):
         )
 
 
-bp.add_url_rule("/<uuid:user_id>", view_func=ChangeUserView.as_view("change_user"), methods=["PUT"])
+bp.add_url_rule("/<uuid:user_id>", view_func=ChangeUserView.as_view("change_user"), methods=["PUT", "GET"])
 bp.add_url_rule("/register", view_func=RegistrationView.as_view("register"), methods=["POST"])
 bp.add_url_rule(
     "/social/delete/<string:provider>", view_func=DeleteSocialAccountView.as_view("social_delete"), methods=["DELETE"]
