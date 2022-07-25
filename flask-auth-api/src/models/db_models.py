@@ -1,9 +1,10 @@
+import enum
 import uuid
 from datetime import datetime
 from functools import partial
 from typing import Optional
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String, Table
+from sqlalchemy import Boolean, Column, DateTime, Enum, Float, ForeignKey, String, Table
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.event import listen
 from sqlalchemy.orm import backref, relationship
@@ -21,6 +22,11 @@ user_role_association_table = Table(
 )
 
 
+class NotificationPolicyStatus(enum.Enum):
+    yes = 'YES'
+    no = 'NO'
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -29,6 +35,9 @@ class User(Base):
     password = Column(String, nullable=False)
     is_superuser = Column(Boolean, default=False, nullable=False)
     email = Column(String, nullable=True)
+    email_verified = Column(Boolean, default=False, nullable=False)
+    notification_policy = Column(Enum(NotificationPolicyStatus), default=NotificationPolicyStatus.yes, nullable=False)
+    timezone = Column(Float, default=0.0, nullable=False)
     roles = relationship("Role", secondary=user_role_association_table, back_populates="users")
     totp_secret = Column(String, nullable=True)
     totp_active = Column(Boolean, default=False, nullable=False)
