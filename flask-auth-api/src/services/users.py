@@ -133,6 +133,9 @@ class ManageUserService(BaseUserService):
         uri = f'$domain/{user_id}?expired={expired}&?redirect_url=$redirect_url'
         return bitly_con.shorten(uri=uri, preferred_domain='j.mp').url
 
+    def publish_user_created_event(self):
+        ...
+
 
 class HistoryUserService(BaseUserService):
     def get_user_history(

@@ -82,6 +82,7 @@ class RegistrationView(CustomSwaggerView):
         created = user_service.create_user(self.validated_body["login"], self.validated_body["password"])
         if not created:
             return make_response(jsonify(MsgSchema().load(Msg.alredy_exists.value)), HTTPStatus.CONFLICT.value)
+        user_service.publish_user_created_event()
         return make_response(jsonify(MsgSchema().load(Msg.created.value)), HTTPStatus.CREATED.value)
 
 
