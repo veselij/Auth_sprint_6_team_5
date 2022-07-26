@@ -52,9 +52,10 @@ class ConfigSettings(BaseSettings):
     logstash_host: str = Field("logstash", env="LOGSTASH_HOST")
     logstash_port: int = Field(5044, env="LOGSTASH_PORT")
 
+    bitly_api_access_token: str = Field("", env="BITLY_API_ACCESS_TOKEN")
+    email_verification_period: int = Field(1, env="EMAIL_VERIFICATION_PERIOD")
+
 
 config = ConfigSettings()
-
-
 
 logger = logging.getLogger(__name__)

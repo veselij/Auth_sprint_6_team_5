@@ -1,4 +1,5 @@
 import json
+import datetime
 from dataclasses import asdict, dataclass, fields
 from time import time
 from typing import NamedTuple, Optional
@@ -9,6 +10,7 @@ from flask_jwt_extended.utils import get_jti
 from sqlalchemy import extract
 from sqlalchemy.dialects.postgresql.base import UUID
 
+import bitly_api
 from core.config import config
 from db.cache import Caches
 from models.db_models import Role, SocialAccount, User, UserAccessHistory
@@ -122,6 +124,14 @@ class ManageUserService(BaseUserService):
             raise LoginPasswordError
         self.log_login_attempt(user.id, True, request_id)
         return self.generate_request_id(user, request_id)
+
+    def generate_email_verification_link(self, user_id: str) -> str:
+        user = self.get_user(user_id)
+        bitly_con = bitly_api.Connection(access_token=config.bitly_api_access_token)
+        expired = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=user.timezone)))\
+            + datetime.timedelta(days=config.email_verification_period)
+        uri = f'$domain/{user_id}?expired={expired}&?redirect_url=$redirect_url'
+        return bitly_con.shorten(uri=uri, preferred_domain='j.mp').url
 
 
 class HistoryUserService(BaseUserService):
