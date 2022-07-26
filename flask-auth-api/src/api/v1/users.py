@@ -1,9 +1,9 @@
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
 from uuid import UUID
 
 from dependency_injector.wiring import Provide, inject
-from flask import Blueprint, abort, jsonify, make_response, url_for
+from flask import Blueprint, abort, jsonify, make_response, url_for, redirect
 from flask.views import MethodView
 from flask.wrappers import Response
 from flask_jwt_extended import get_jti, get_jwt, jwt_required
@@ -23,6 +23,7 @@ from models.users_response_schemas import (
     UserHistorySchema,
     UserNotificationInfoSchema,
     UserUUIDSchema,
+    UserVerificationQuerySchema,
 )
 from services.request import RequestService
 from services.users import (
@@ -249,6 +250,43 @@ class ChangeUserView(CustomSwaggerView):
         return make_response(jsonify(UserNotificationInfoSchema(many=True).dump(user)), HTTPStatus.OK.value)
 
 
+class UserVerificationView(CustomSwaggerView):
+    decorators = [revoked_token_check(), jwt_verification()]
+
+    tags = ['users']
+    parameters = [
+        {"in": "path", "name": "user_id", "schema": {"type": "string", "format": "uuid"}, "required": True},
+        {"in": "query", "name": "expired", "schema": {"type": "string", "format": "datetime"}, "required": True},
+        {"in": "query", "name": "redirect_url", "schema": {"type": "string"}, "required": True},
+    ]
+
+    responses = {
+        HTTPStatus.OK.value: {
+            "description": HTTPStatus.OK.phrase,
+            "content": {
+                "application/json": {"schema": {"type": "array", "items": UserHistorySchema}},
+            },
+        },
+        HTTPStatus.UNAUTHORIZED.value: {
+            "description": HTTPStatus.UNAUTHORIZED.phrase,
+            "content": {"application/json": {"schema": MsgSchema, "example": Msg.unauthorized.value}},
+        },
+        HTTPStatus.NOT_FOUND.value: {
+            "description": HTTPStatus.NOT_FOUND.phrase,
+            "content": {"application/json": {"schema": MsgSchema, "example": Msg.not_found.value}},
+        },
+    }
+
+    @inject
+    def get(self, user_id: str, user_service: ManageUserService = Provide[Container.manage_user_service ]) -> Response:
+        self.validate_path(UserUUIDSchema)
+        self.validate_query(UserVerificationQuerySchema)
+        user = user_service.get_user(user_id)
+        expired = datetime.fromisoformat(self.validated_query['expired'])
+        if datetime.now(timezone(timedelta(hours=user.timezone))) >= expired:
+            return make_response(jsonify(MsgSchema().load(Msg.not_found.value)), HTTPStatus.NOT_FOUND.value)
+        return redirect(self.validated_query['redirect_url'], HTTPStatus.OK.value, Response=None)
+
 
 class UserHistoryView(CustomSwaggerView):
     decorators = [revoked_token_check(), jwt_verification()]
@@ -447,3 +485,4 @@ bp.add_url_rule("/login", view_func=LoginView.as_view("login"), methods=["POST"]
 bp.add_url_rule("/refresh/<uuid:user_id>", view_func=RefreshView.as_view("refresh"), methods=["GET"])
 bp.add_url_rule("/logout/<uuid:user_id>", view_func=LogoutView.as_view("logout"), methods=["GET"])
 bp.add_url_rule("/history/<uuid:user_id>", view_func=UserHistoryView.as_view("history"), methods=["GET"])
+bp.add_url_rule("/verificate/<uuid:user_id>", view_func=UserVerificationView.as_view("verification"), methods=["GET"])

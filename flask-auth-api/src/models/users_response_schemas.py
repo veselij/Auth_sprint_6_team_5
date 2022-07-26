@@ -65,6 +65,11 @@ class UserHistoryQuerySchema(PaginationSchema):
     month = fields.Int(validate=Range(1, 12))
 
 
+class UserVerificationQuerySchema(Schema):
+    expired = fields.Str(required=True)
+    redirect_url = fields.Str(required=True)
+
+
 class RoleSchema(Schema):
     id = fields.UUID(required=False)
     role = fields.Str(required=True)
