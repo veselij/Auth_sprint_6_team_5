@@ -9,7 +9,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 from alembic import op
-
+from models.db_models import NotificationPolicyStatus
 # revision identifiers, used by Alembic.
 revision = "e885b2d87645"
 down_revision = None
@@ -35,6 +35,9 @@ def upgrade():
         sa.Column("password", sa.String(), nullable=False),
         sa.Column("is_superuser", sa.Boolean(), nullable=False),
         sa.Column("email", sa.String(), nullable=True),
+        sa.Column("email_verified",  sa.Boolean(), nullable=False),
+        sa.Column("notification_policy", sa.Enum(NotificationPolicyStatus), nullable=False),
+        sa.Column("timezone", sa.Float(), nullable=False),
         sa.Column("totp_secret", sa.String(), nullable=True),
         sa.Column("totp_active", sa.Boolean(), nullable=False),
         sa.Column("totp_sync", sa.Boolean(), nullable=False),

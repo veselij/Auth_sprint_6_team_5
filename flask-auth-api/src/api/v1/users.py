@@ -248,7 +248,7 @@ class ChangeUserView(CustomSwaggerView):
         user = user_service.get_user(user_id)
         if not user:
             return make_response(jsonify(MsgSchema().load(Msg.not_found.value)), HTTPStatus.NOT_FOUND.value)
-        return make_response(jsonify(UserNotificationInfoSchema(many=True).dump(user)), HTTPStatus.OK.value)
+        return make_response(jsonify(UserNotificationInfoSchema().dump(user)), HTTPStatus.OK.value)
 
 
 class UserVerificationView(CustomSwaggerView):
@@ -286,6 +286,7 @@ class UserVerificationView(CustomSwaggerView):
         expired = datetime.fromisoformat(self.validated_query['expired'])
         if datetime.now(timezone(timedelta(hours=user.timezone))) >= expired:
             return make_response(jsonify(MsgSchema().load(Msg.not_found.value)), HTTPStatus.NOT_FOUND.value)
+        user_service.update_user_data(user, {'email_verified': True})
         return redirect(self.validated_query['redirect_url'], HTTPStatus.OK.value, Response=None)
 
 
