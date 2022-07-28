@@ -1,5 +1,5 @@
-import json
 import datetime
+import json
 from dataclasses import asdict, dataclass, fields
 from time import time
 from typing import NamedTuple, Optional
@@ -10,12 +10,12 @@ from flask_jwt_extended.utils import get_jti
 from sqlalchemy import extract
 from sqlalchemy.dialects.postgresql.base import UUID
 
-import bitly_api
 from core.config import config
 from db.cache import Caches
 from models.db_models import Role, SocialAccount, User, UserAccessHistory
 from repository.repository import Repositiry
 from social.userdata import UserData
+from utils.bitly import get_short_link
 from utils.exceptions import (
     ConflictError,
     InvalidTokenError,
@@ -45,17 +45,25 @@ class BaseUserService:
         self.repository = repository
         self.cache = cache
 
-    def generate_request_id(self, user: User, request_id: str, required_fields: Optional[list] = None) -> RequestId:
+    def generate_request_id(
+        self, user: User, request_id: str, required_fields: Optional[list] = None
+    ) -> RequestId:
         if user.totp_active:
             token = None
             required_fields = required_fields or []
             self._put_user_data_to_cache(user, request_id, required_fields)
         else:
-            token = get_token(user.id, user.is_superuser, self.get_user_roles(user.id), [])
-            self.cache.refresh_cache.set_value(
-                name=str(get_jti(token.refresh_token)), value=str(user.id), ex=config.refresh_ttl
+            token = get_token(
+                user.id, user.is_superuser, self.get_user_roles(user.id), []
             )
-        return RequestId(request_id=request_id, totp_active=user.totp_active, token=token)
+            self.cache.refresh_cache.set_value(
+                name=str(get_jti(token.refresh_token)),
+                value=str(user.id),
+                ex=config.refresh_ttl,
+            )
+        return RequestId(
+            request_id=request_id, totp_active=user.totp_active, token=token
+        )
 
     def log_login_attempt(
         self,
@@ -84,13 +92,19 @@ class BaseUserService:
             data[jti] = value
         else:
             data = {jti: value}
-        self.cache.access_cache.set_value(str(user_id), json.dumps(data), ex=config.refresh_ttl)
+        self.cache.access_cache.set_value(
+            str(user_id), json.dumps(data), ex=config.refresh_ttl
+        )
 
-    def _put_user_data_to_cache(self, user: User, request_id: str, required_fields: list) -> None:
+    def _put_user_data_to_cache(
+        self, user: User, request_id: str, required_fields: list
+    ) -> None:
         user_data = user.to_dict()
         user_data["required_fields"] = required_fields
         user_data["roles"] = self.get_user_roles(user.id)
-        self.cache.request_cache.set_value(request_id, json.dumps(user_data), config.request_ttl)
+        self.cache.request_cache.set_value(
+            request_id, json.dumps(user_data), config.request_ttl
+        )
 
     def get_user_roles(self, user_id: str) -> list[Optional[str]]:
         roles = self.repository.get_joined_objects_by_field(Role, User.roles)
@@ -101,14 +115,17 @@ class BaseUserService:
 
 class ManageUserService(BaseUserService):
     @tracing
-    def create_user(self, username: str, password: str) -> bool:
+    def create_user(self, username: str, password: str) -> Optional[str]:
         user = User(login=username, password=get_password_hash(password))
-        return self.repository.create_obj_in_db(user)
+        if self.repository.create_obj_in_db(user):
+            return str(self.repository.get_object_by_field(User, login=username).id)
 
     def update_user_data(self, user: User, fields: dict) -> None:
         if "password" in fields:
             fields["password"] = get_password_hash(fields["password"])
-        if not self.repository.update_obj_in_db(obj=User, fileds_to_update=fields, id=user.id):
+        if not self.repository.update_obj_in_db(
+            obj=User, fileds_to_update=fields, id=user.id
+        ):
             raise ConflictError
 
     def get_user(self, user_id: str) -> Optional[User]:
@@ -127,14 +144,15 @@ class ManageUserService(BaseUserService):
 
     def generate_email_verification_link(self, user_id: str) -> str:
         user = self.get_user(user_id)
-        bitly_con = bitly_api.Connection(access_token=config.bitly_api_access_token)
-        expired = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=user.timezone)))\
-            + datetime.timedelta(days=config.email_verification_period)
-        uri = f'$domain/{user_id}?expired={expired}&?redirect_url=$redirect_url'
-        return bitly_con.shorten(uri=uri, preferred_domain='j.mp').url
+        expired = datetime.datetime.now(
+            datetime.timezone(datetime.timedelta(hours=user.timezone))
+        ) + datetime.timedelta(days=config.email_verification_period)
+        uri = f"{config.site_domain}/{user_id}?expired={expired}&?redirect_url={config.redirect_url}"
+        return get_short_link(uri)
 
-    def publish_user_created_event(self):
-        ...
+    def publish_user_created_event(self, user_id: str) -> None:
+        url = self.generate_email_verification_link(user_id)
+        print(url)
 
 
 class HistoryUserService(BaseUserService):
@@ -148,22 +166,30 @@ class HistoryUserService(BaseUserService):
     def _get_user_history_from_db(
         self, user_id: str, start: int, end: int, year: int, month: int
     ) -> Optional[UserAccessHistory]:
-        user_access_history = self.repository.get_objects_by_field(UserAccessHistory, user_id=user_id)
+        user_access_history = self.repository.get_objects_by_field(
+            UserAccessHistory, user_id=user_id
+        )
         if user_access_history:
             month_user_access_history = user_access_history.filter(
                 extract("month", UserAccessHistory.login_date) == month
             ).filter(extract("year", UserAccessHistory.login_date) == year)
-            return month_user_access_history.order_by(UserAccessHistory.login_date.desc()).slice(start, end)
+            return month_user_access_history.order_by(
+                UserAccessHistory.login_date.desc()
+            ).slice(start, end)
 
 
 class RoleUserService(BaseUserService):
     def add_user_roles(self, user_id: str, role_ids: list) -> bool:
         self.revoke_access_token(user_id)
-        return self.repository.add_many_to_many_row(User, user_id, Role, role_ids, "roles")
+        return self.repository.add_many_to_many_row(
+            User, user_id, Role, role_ids, "roles"
+        )
 
     def remove_user_roles(self, user_id: str, role_ids: list) -> bool:
         self.revoke_access_token(user_id)
-        return self.repository.remove_many_to_many_row(User, user_id, Role, role_ids, "roles")
+        return self.repository.remove_many_to_many_row(
+            User, user_id, Role, role_ids, "roles"
+        )
 
     def check_user_roles(self, access_token: str) -> list:
         token = decode_token(access_token)
@@ -194,7 +220,9 @@ class ManageSocialUserService(BaseUserService):
     def delete_social_account(self, token: dict, provider: str) -> None:
         user_id = str(token["sub"])
         self.revoke_access_token(user_id)
-        if not self.repository.delete_object_by_field(SocialAccount, user_id=user_id, social_name=provider):
+        if not self.repository.delete_object_by_field(
+            SocialAccount, user_id=user_id, social_name=provider
+        ):
             raise ObjectDoesNotExistError
 
     def _create_random_user(self, email: str) -> Optional[User]:
@@ -204,7 +232,9 @@ class ManageSocialUserService(BaseUserService):
             user = User(**asdict(random_fields))
             user.email = email
             if self.repository.create_obj_in_db(user):
-                return self.repository.get_object_by_field(User, login=random_fields.login)
+                return self.repository.get_object_by_field(
+                    User, login=random_fields.login
+                )
             attempts -= 1
         return
 
