@@ -63,6 +63,10 @@ class ConfigSettings(BaseSettings):
     site_domain: str = Field("example.com", env="SITE_DOMAIN")
     redirect_url: str = Field("example.com", env="REDIRECT_URL")
 
+    rabbit_host: str = Field("localhost", env="RABBIT_HOST")
+    rabbit_queue: str = Field("WELCOME_QUEUE", env="RABBIT_QUEUE")
+    notificaion_template: str = Field("123", env="NOTIFICATION_TEMPLATE")
+
 
 config = ConfigSettings()
 

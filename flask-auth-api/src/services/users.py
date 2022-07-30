@@ -10,9 +10,11 @@ from flask_jwt_extended.utils import get_jti
 from sqlalchemy import extract
 from sqlalchemy.dialects.postgresql.base import UUID
 
-from core.config import config
+from core.config import config, logger
 from db.cache import Caches
+from db.rabbit import PikaClient
 from models.db_models import Role, SocialAccount, User, UserAccessHistory
+from models.notification import Message
 from repository.repository import Repositiry
 from social.userdata import UserData
 from utils.bitly import get_short_link
@@ -114,6 +116,10 @@ class BaseUserService:
 
 
 class ManageUserService(BaseUserService):
+    def __init__(self, repository: Repositiry, cache: Caches, pika: PikaClient) -> None:
+        super().__init__(repository, cache)
+        self.pika = pika
+
     @tracing
     def create_user(self, username: str, password: str) -> Optional[str]:
         user = User(login=username, password=get_password_hash(password))
@@ -152,7 +158,18 @@ class ManageUserService(BaseUserService):
 
     def publish_user_created_event(self, user_id: str) -> None:
         url = self.generate_email_verification_link(user_id)
-        print(url)
+        message = Message(
+            notification_name="new_user",
+            user_id=user_id,
+            content_id="",
+            content_value=url,
+            template_id=config.notificaion_template,
+        )
+        with self.pika.rabbit_connection() as conn:
+            conn.basic_publish(
+                exchange="", routing_key=config.rabbit_queue, body=message.json()
+            )
+        logger.info("new user event published")
 
 
 class HistoryUserService(BaseUserService):
