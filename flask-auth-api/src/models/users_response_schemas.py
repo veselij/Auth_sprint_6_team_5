@@ -65,6 +65,11 @@ class UserHistoryQuerySchema(PaginationSchema):
     month = fields.Int(validate=Range(1, 12))
 
 
+class UserVerificationQuerySchema(Schema):
+    expired = fields.Str(required=True)
+    redirect_url = fields.Str(required=True)
+
+
 class RoleSchema(Schema):
     id = fields.UUID(required=False)
     role = fields.Str(required=True)
@@ -98,3 +103,11 @@ class RequestSchema(Schema):
 class RequestIdSchema(RequestSchema):
     totp_active = fields.Bool(required=True)
     token = fields.Nested(SocialTokenSchema, required=True)
+
+
+class UserNotificationInfoSchema(Schema):
+    user_id = fields.UUID()
+    email = fields.Str()
+    email_verified = fields.Bool()
+    notification_policy = fields.Str()
+    timezone = fields.Float()

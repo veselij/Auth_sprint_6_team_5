@@ -4,7 +4,11 @@ from typing import Optional
 from pydantic import BaseSettings, Field
 
 SWAGGER_TEMPLATE = {
-    "components": {"securitySchemes": {"bearerAuth": {"type": "apiKey", "name": "Authorization", "in": "header"}}},
+    "components": {
+        "securitySchemes": {
+            "bearerAuth": {"type": "apiKey", "name": "Authorization", "in": "header"}
+        }
+    },
     "security": {"bearerAuth": []},
 }
 
@@ -27,7 +31,9 @@ class ConfigSettings(BaseSettings):
     superuser: Optional[str] = Field(None, env="SUPERUSER")
     superuser_password: Optional[str] = Field(None, env="SUPERUSER_PASSWORD")
 
-    secret: str = Field("7da9c735ec6e9e9c2a5a8731a39a3a71547c4c8f99d4057e1a5eab0243dc9938", env="SECRET")
+    secret: str = Field(
+        "7da9c735ec6e9e9c2a5a8731a39a3a71547c4c8f99d4057e1a5eab0243dc9938", env="SECRET"
+    )
     access_ttl: int = Field(60 * 60, env="ACCESS_TTL")
     refresh_ttl: int = Field(60 * 60 * 24, env="REFRESH_TTL")
 
@@ -52,9 +58,16 @@ class ConfigSettings(BaseSettings):
     logstash_host: str = Field("logstash", env="LOGSTASH_HOST")
     logstash_port: int = Field(5044, env="LOGSTASH_PORT")
 
+    bitly_api_access_token: str = Field("", env="BITLY_API_ACCESS_TOKEN")
+    email_verification_period: int = Field(1, env="EMAIL_VERIFICATION_PERIOD")
+    site_domain: str = Field("example.com", env="SITE_DOMAIN")
+    redirect_url: str = Field("example.com", env="REDIRECT_URL")
+
+    rabbit_host: str = Field("localhost", env="RABBIT_HOST")
+    rabbit_queue: str = Field("WELCOME_QUEUE", env="RABBIT_QUEUE")
+    notificaion_template: str = Field("123", env="NOTIFICATION_TEMPLATE")
+
 
 config = ConfigSettings()
-
-
 
 logger = logging.getLogger(__name__)

@@ -1,9 +1,9 @@
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
 from uuid import UUID
 
 from dependency_injector.wiring import Provide, inject
-from flask import Blueprint, abort, jsonify, make_response, url_for
+from flask import Blueprint, abort, jsonify, make_response, redirect, url_for
 from flask.views import MethodView
 from flask.wrappers import Response
 from flask_jwt_extended import get_jti, get_jwt, jwt_required
@@ -21,7 +21,9 @@ from models.users_response_schemas import (
     TokenSchema,
     UserHistoryQuerySchema,
     UserHistorySchema,
+    UserNotificationInfoSchema,
     UserUUIDSchema,
+    UserVerificationQuerySchema,
 )
 from services.request import RequestService
 from services.users import (
@@ -53,7 +55,10 @@ class RegistrationView(CustomSwaggerView):
     tags = ["users"]
     requestBody = {
         "content": {
-            "application/json": {"schema": AuthSchema, "example": {"login": "admin123", "password": "admin123"}},
+            "application/json": {
+                "schema": AuthSchema,
+                "example": {"login": "admin123", "password": "admin123"},
+            },
         },
     }
     responses = {
@@ -65,22 +70,42 @@ class RegistrationView(CustomSwaggerView):
         },
         HTTPStatus.CONFLICT.value: {
             "description": HTTPStatus.CONFLICT.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": Msg.alredy_exists.value}},
+            "content": {
+                "application/json": {
+                    "schema": MsgSchema,
+                    "example": Msg.alredy_exists.value,
+                }
+            },
         },
         HTTPStatus.TOO_MANY_REQUESTS.value: {
             "description": HTTPStatus.TOO_MANY_REQUESTS.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": Msg.rate_limit.value}},
+            "content": {
+                "application/json": {
+                    "schema": MsgSchema,
+                    "example": Msg.rate_limit.value,
+                }
+            },
         },
     }
 
     @inject
-    def post(self, user_service: ManageUserService = Provide[Container.manage_user_service]) -> Response:
+    def post(
+        self, user_service: ManageUserService = Provide[Container.manage_user_service]
+    ) -> Response:
         self.validate_body(AuthSchema)
 
-        created = user_service.create_user(self.validated_body["login"], self.validated_body["password"])
-        if not created:
-            return make_response(jsonify(MsgSchema().load(Msg.alredy_exists.value)), HTTPStatus.CONFLICT.value)
-        return make_response(jsonify(MsgSchema().load(Msg.created.value)), HTTPStatus.CREATED.value)
+        user_id = user_service.create_user(
+            self.validated_body["login"], self.validated_body["password"]
+        )
+        if user_id is None:
+            return make_response(
+                jsonify(MsgSchema().load(Msg.alredy_exists.value)),
+                HTTPStatus.CONFLICT.value,
+            )
+        user_service.publish_user_created_event(user_id)
+        return make_response(
+            jsonify(MsgSchema().load(Msg.created.value)), HTTPStatus.CREATED.value
+        )
 
 
 class LoginView(CustomSwaggerView):
@@ -88,7 +113,10 @@ class LoginView(CustomSwaggerView):
     tags = ["users"]
     requestBody = {
         "content": {
-            "application/json": {"schema": AuthSchema, "example": {"login": "admin123", "password": "admin123"}},
+            "application/json": {
+                "schema": AuthSchema,
+                "example": {"login": "admin123", "password": "admin123"},
+            },
         },
     }
     responses = {
@@ -100,18 +128,30 @@ class LoginView(CustomSwaggerView):
         },
         HTTPStatus.UNAUTHORIZED.value: {
             "description": HTTPStatus.UNAUTHORIZED.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": Msg.unauthorized.value}},
+            "content": {
+                "application/json": {
+                    "schema": MsgSchema,
+                    "example": Msg.unauthorized.value,
+                }
+            },
         },
     }
 
     @inject
-    def post(self, user_service: ManageUserService = Provide[Container.manage_user_service]) -> Response:
+    def post(
+        self, user_service: ManageUserService = Provide[Container.manage_user_service]
+    ) -> Response:
         self.validate_body(AuthSchema)
 
         try:
-            request_id = user_service.autorize_user(self.validated_body["login"], self.validated_body["password"])
+            request_id = user_service.autorize_user(
+                self.validated_body["login"], self.validated_body["password"]
+            )
         except LoginPasswordError:
-            return make_response(jsonify(MsgSchema().load(Msg.unauthorized.value)), HTTPStatus.UNAUTHORIZED.value)
+            return make_response(
+                jsonify(MsgSchema().load(Msg.unauthorized.value)),
+                HTTPStatus.UNAUTHORIZED.value,
+            )
         return make_response(
             jsonify(RequestIdSchema().dump(request_id)),
             HTTPStatus.OK.value,
@@ -123,7 +163,14 @@ class RefreshView(CustomSwaggerView):
 
     tags = ["users"]
 
-    parameters = [{"in": "path", "name": "user_id", "schema": {"type": "string", "format": "uuid"}, "required": True}]
+    parameters = [
+        {
+            "in": "path",
+            "name": "user_id",
+            "schema": {"type": "string", "format": "uuid"},
+            "required": True,
+        }
+    ]
     responses = {
         HTTPStatus.OK.value: {
             "description": HTTPStatus.OK.phrase,
@@ -133,7 +180,12 @@ class RefreshView(CustomSwaggerView):
         },
         HTTPStatus.UNAUTHORIZED.value: {
             "description": HTTPStatus.UNAUTHORIZED.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": Msg.unauthorized.value}},
+            "content": {
+                "application/json": {
+                    "schema": MsgSchema,
+                    "example": Msg.unauthorized.value,
+                }
+            },
         },
     }
 
@@ -149,11 +201,16 @@ class RefreshView(CustomSwaggerView):
 
         token = get_jwt()
         if not request_service.check_refresh_token(token, user):
-            return make_response(jsonify(MsgSchema().load(Msg.unauthorized.value)), HTTPStatus.UNAUTHORIZED.value)
+            return make_response(
+                jsonify(MsgSchema().load(Msg.unauthorized.value)),
+                HTTPStatus.UNAUTHORIZED.value,
+            )
         return make_response(
             jsonify(
                 TokenSchema().dump(
-                    request_service.generate_tokens(user, token["admin"], user_service.get_user_roles(user))
+                    request_service.generate_tokens(
+                        user, token["admin"], user_service.get_user_roles(user)
+                    )
                 )
             ),
             HTTPStatus.OK.value,
@@ -166,22 +223,42 @@ class LogoutView(CustomSwaggerView):
     tags = ["users"]
 
     parameters = [
-        {"in": "path", "name": "user_id", "schema": {"type": "string", "format": "uuid"}, "required": True},
-        {"in": "query", "name": "all_devices", "schema": {"type": "string", "enum": ["false", "true"]}},
+        {
+            "in": "path",
+            "name": "user_id",
+            "schema": {"type": "string", "format": "uuid"},
+            "required": True,
+        },
+        {
+            "in": "query",
+            "name": "all_devices",
+            "schema": {"type": "string", "enum": ["false", "true"]},
+        },
     ]
     responses = {
         HTTPStatus.OK.value: {
             "description": HTTPStatus.OK.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": Msg.ok.value}},
+            "content": {
+                "application/json": {"schema": MsgSchema, "example": Msg.ok.value}
+            },
         },
         HTTPStatus.UNAUTHORIZED.value: {
             "description": HTTPStatus.UNAUTHORIZED.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": Msg.unauthorized.value}},
+            "content": {
+                "application/json": {
+                    "schema": MsgSchema,
+                    "example": Msg.unauthorized.value,
+                }
+            },
         },
     }
 
     @inject
-    def get(self, user_id: str, user_service: BaseUserService = Provide[Container.base_user_service]) -> Response:
+    def get(
+        self,
+        user_id: str,
+        user_service: BaseUserService = Provide[Container.base_user_service],
+    ) -> Response:
         self.validate_path(UserUUIDSchema)
         self.validate_query(AllDevicesSchema)
 
@@ -190,52 +267,187 @@ class LogoutView(CustomSwaggerView):
         else:
             jti = get_jwt()["jti"]
             user_service.revoke_access_token(user_id, jti)
-        return make_response(jsonify(MsgSchema().load(Msg.ok.value)), HTTPStatus.OK.value)
+        return make_response(
+            jsonify(MsgSchema().load(Msg.ok.value)), HTTPStatus.OK.value
+        )
 
 
 class ChangeUserView(CustomSwaggerView):
     decorators = [revoked_token_check(), jwt_verification()]
 
     tags = ["users"]
-    parameters = [{"in": "path", "name": "user_id", "schema": {"type": "string", "format": "uuid"}, "required": True}]
+    parameters = [
+        {
+            "in": "path",
+            "name": "user_id",
+            "schema": {"type": "string", "format": "uuid"},
+            "required": True,
+        }
+    ]
     requestBody = {
         "content": {
-            "application/json": {"schema": AuthSchema, "example": {"login": "admin123", "password": "admin123"}},
+            "application/json": {
+                "schema": AuthSchema,
+                "example": {"login": "admin123", "password": "admin123"},
+            },
         },
     }
     responses = {
         HTTPStatus.OK.value: {
             "description": HTTPStatus.OK.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": Msg.ok.value}},
+            "content": {
+                "application/json": {"schema": MsgSchema, "example": Msg.ok.value}
+            },
         },
         HTTPStatus.UNAUTHORIZED.value: {
             "description": HTTPStatus.UNAUTHORIZED.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": Msg.unauthorized.value}},
+            "content": {
+                "application/json": {
+                    "schema": MsgSchema,
+                    "example": Msg.unauthorized.value,
+                }
+            },
         },
         HTTPStatus.NOT_FOUND.value: {
             "description": HTTPStatus.NOT_FOUND.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": Msg.not_found.value}},
+            "content": {
+                "application/json": {
+                    "schema": MsgSchema,
+                    "example": Msg.not_found.value,
+                }
+            },
         },
         HTTPStatus.CONFLICT.value: {
             "description": HTTPStatus.CONFLICT.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": Msg.alredy_exists.value}},
+            "content": {
+                "application/json": {
+                    "schema": MsgSchema,
+                    "example": Msg.alredy_exists.value,
+                }
+            },
         },
     }
 
     @inject
-    def put(self, user_id: str, user_service: ManageUserService = Provide[Container.manage_user_service]) -> Response:
+    def put(
+        self,
+        user_id: str,
+        user_service: ManageUserService = Provide[Container.manage_user_service],
+    ) -> Response:
         self.validate_body(AuthSchema)
         self.validate_path(UserUUIDSchema)
 
         user = user_service.get_user(user_id)
         if not user:
-            return make_response(jsonify(MsgSchema().load(Msg.not_found.value)), HTTPStatus.NOT_FOUND.value)
+            return make_response(
+                jsonify(MsgSchema().load(Msg.not_found.value)),
+                HTTPStatus.NOT_FOUND.value,
+            )
 
         try:
             user_service.update_user_data(user, self.validated_body)
         except ConflictError:
-            return make_response(jsonify(MsgSchema().load(Msg.alredy_exists.value)), HTTPStatus.CONFLICT.value)
-        return make_response(jsonify(MsgSchema().load(Msg.ok.value)), HTTPStatus.OK.value)
+            return make_response(
+                jsonify(MsgSchema().load(Msg.alredy_exists.value)),
+                HTTPStatus.CONFLICT.value,
+            )
+        return make_response(
+            jsonify(MsgSchema().load(Msg.ok.value)), HTTPStatus.OK.value
+        )
+
+    @inject
+    def get(
+        self,
+        user_id: str,
+        user_service: ManageUserService = Provide[Container.manage_user_service],
+    ) -> Response:
+        self.validate_body(AuthSchema)
+        self.validate_path(UserUUIDSchema)
+
+        user = user_service.get_user(user_id)
+        if not user:
+            return make_response(
+                jsonify(MsgSchema().load(Msg.not_found.value)),
+                HTTPStatus.NOT_FOUND.value,
+            )
+        return make_response(
+            jsonify(UserNotificationInfoSchema().dump(user)), HTTPStatus.OK.value
+        )
+
+
+class UserVerificationView(CustomSwaggerView):
+    decorators = [revoked_token_check(), jwt_verification()]
+
+    tags = ["users"]
+    parameters = [
+        {
+            "in": "path",
+            "name": "user_id",
+            "schema": {"type": "string", "format": "uuid"},
+            "required": True,
+        },
+        {
+            "in": "query",
+            "name": "expired",
+            "schema": {"type": "string", "format": "datetime"},
+            "required": True,
+        },
+        {
+            "in": "query",
+            "name": "redirect_url",
+            "schema": {"type": "string"},
+            "required": True,
+        },
+    ]
+
+    responses = {
+        HTTPStatus.OK.value: {
+            "description": HTTPStatus.OK.phrase,
+            "content": {
+                "application/json": {
+                    "schema": {"type": "array", "items": UserHistorySchema}
+                },
+            },
+        },
+        HTTPStatus.UNAUTHORIZED.value: {
+            "description": HTTPStatus.UNAUTHORIZED.phrase,
+            "content": {
+                "application/json": {
+                    "schema": MsgSchema,
+                    "example": Msg.unauthorized.value,
+                }
+            },
+        },
+        HTTPStatus.NOT_FOUND.value: {
+            "description": HTTPStatus.NOT_FOUND.phrase,
+            "content": {
+                "application/json": {
+                    "schema": MsgSchema,
+                    "example": Msg.not_found.value,
+                }
+            },
+        },
+    }
+
+    @inject
+    def get(
+        self,
+        user_id: str,
+        user_service: ManageUserService = Provide[Container.manage_user_service],
+    ) -> Response:
+        self.validate_path(UserUUIDSchema)
+        self.validate_query(UserVerificationQuerySchema)
+        user = user_service.get_user(user_id)
+        expired = datetime.fromisoformat(self.validated_query["expired"])
+        if datetime.now(timezone(timedelta(hours=user.timezone))) >= expired:
+            return make_response(
+                jsonify(MsgSchema().load(Msg.not_found.value)),
+                HTTPStatus.NOT_FOUND.value,
+            )
+        user_service.update_user_data(user, {"email_verified": True})
+        return redirect(
+            self.validated_query["redirect_url"], HTTPStatus.OK.value, Response=None
+        )
 
 
 class UserHistoryView(CustomSwaggerView):
@@ -243,7 +455,12 @@ class UserHistoryView(CustomSwaggerView):
 
     tags = ["users"]
     parameters = [
-        {"in": "path", "name": "user_id", "schema": {"type": "string", "format": "uuid"}, "required": True},
+        {
+            "in": "path",
+            "name": "user_id",
+            "schema": {"type": "string", "format": "uuid"},
+            "required": True,
+        },
         {
             "in": "query",
             "name": "page_num",
@@ -288,21 +505,37 @@ class UserHistoryView(CustomSwaggerView):
         HTTPStatus.OK.value: {
             "description": HTTPStatus.OK.phrase,
             "content": {
-                "application/json": {"schema": {"type": "array", "items": UserHistorySchema}},
+                "application/json": {
+                    "schema": {"type": "array", "items": UserHistorySchema}
+                },
             },
         },
         HTTPStatus.UNAUTHORIZED.value: {
             "description": HTTPStatus.UNAUTHORIZED.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": Msg.unauthorized.value}},
+            "content": {
+                "application/json": {
+                    "schema": MsgSchema,
+                    "example": Msg.unauthorized.value,
+                }
+            },
         },
         HTTPStatus.NOT_FOUND.value: {
             "description": HTTPStatus.NOT_FOUND.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": Msg.not_found.value}},
+            "content": {
+                "application/json": {
+                    "schema": MsgSchema,
+                    "example": Msg.not_found.value,
+                }
+            },
         },
     }
 
     @inject
-    def get(self, user_id: str, user_service: HistoryUserService = Provide[Container.history_user_service ]) -> Response:
+    def get(
+        self,
+        user_id: str,
+        user_service: HistoryUserService = Provide[Container.history_user_service],
+    ) -> Response:
         self.validate_path(UserUUIDSchema)
         self.validate_query(UserHistoryQuerySchema)
 
@@ -314,9 +547,15 @@ class UserHistoryView(CustomSwaggerView):
             self.validated_query.get("month", datetime.now().month),
         )
         if not user_history:
-            return make_response(jsonify(MsgSchema().load(Msg.not_found.value)), HTTPStatus.NOT_FOUND.value)
+            return make_response(
+                jsonify(MsgSchema().load(Msg.not_found.value)),
+                HTTPStatus.NOT_FOUND.value,
+            )
 
-        return make_response(jsonify(UserHistorySchema(many=True).dump(user_history)), HTTPStatus.OK.value)
+        return make_response(
+            jsonify(UserHistorySchema(many=True).dump(user_history)),
+            HTTPStatus.OK.value,
+        )
 
 
 class SocialLoginView(CustomSwaggerView):
@@ -338,28 +577,48 @@ class SocialLoginView(CustomSwaggerView):
         },
         HTTPStatus.NOT_FOUND.value: {
             "description": HTTPStatus.NOT_FOUND.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": Msg.not_found.value}},
+            "content": {
+                "application/json": {
+                    "schema": MsgSchema,
+                    "example": Msg.not_found.value,
+                }
+            },
         },
     }
 
     @inject
-    def get(self, provider: str, user_service: ManageSocialUserService = Provide[Container.manage_social_user_service ]) -> Response:
+    def get(
+        self,
+        provider: str,
+        user_service: ManageSocialUserService = Provide[
+            Container.manage_social_user_service
+        ],
+    ) -> Response:
         self.validate_path(ProvidersSchema)
         client = oauth.create_client(provider)
 
         if not client:
-            return make_response(jsonify(MsgSchema().load(Msg.not_found.value)), HTTPStatus.NOT_FOUND.value)
+            return make_response(
+                jsonify(MsgSchema().load(Msg.not_found.value)),
+                HTTPStatus.NOT_FOUND.value,
+            )
 
         token = client.authorize_access_token()
         try:
             user_data = user_data_registry[provider](token, client)
         except ProviderAuthTokenError:
-            return make_response(jsonify(MsgSchema().load(Msg.unauthorized.value)), HTTPStatus.UNAUTHORIZED.value)
+            return make_response(
+                jsonify(MsgSchema().load(Msg.unauthorized.value)),
+                HTTPStatus.UNAUTHORIZED.value,
+            )
 
         try:
             request_id = user_service.login_via_social_provider(user_data)
         except (ObjectDoesNotExistError, ConflictError):
-            return make_response(jsonify(MsgSchema().load(Msg.not_found.value)), HTTPStatus.NOT_FOUND.value)
+            return make_response(
+                jsonify(MsgSchema().load(Msg.not_found.value)),
+                HTTPStatus.NOT_FOUND.value,
+            )
 
         return make_response(
             jsonify(RequestIdSchema().dump(request_id)),
@@ -393,20 +652,38 @@ class DeleteSocialAccountView(CustomSwaggerView):
     responses = {
         HTTPStatus.OK.value: {
             "description": HTTPStatus.OK.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": Msg.ok.value}},
+            "content": {
+                "application/json": {"schema": MsgSchema, "example": Msg.ok.value}
+            },
         },
         HTTPStatus.NOT_FOUND.value: {
             "description": HTTPStatus.NOT_FOUND.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": Msg.not_found.value}},
+            "content": {
+                "application/json": {
+                    "schema": MsgSchema,
+                    "example": Msg.not_found.value,
+                }
+            },
         },
         HTTPStatus.UNAUTHORIZED.value: {
             "description": HTTPStatus.UNAUTHORIZED.phrase,
-            "content": {"application/json": {"schema": MsgSchema, "example": Msg.unauthorized.value}},
+            "content": {
+                "application/json": {
+                    "schema": MsgSchema,
+                    "example": Msg.unauthorized.value,
+                }
+            },
         },
     }
 
     @inject
-    def delete(self, provider: str, user_service: ManageSocialUserService = Provide[Container.manage_social_user_service]) -> Response:
+    def delete(
+        self,
+        provider: str,
+        user_service: ManageSocialUserService = Provide[
+            Container.manage_social_user_service
+        ],
+    ) -> Response:
         self.validate_path(ProvidersSchema)
 
         token = get_jwt()
@@ -414,7 +691,10 @@ class DeleteSocialAccountView(CustomSwaggerView):
         try:
             user_service.delete_social_account(token, provider)
         except ObjectDoesNotExistError:
-            return make_response(jsonify(MsgSchema().load(Msg.not_found.value)), HTTPStatus.NOT_FOUND.value)
+            return make_response(
+                jsonify(MsgSchema().load(Msg.not_found.value)),
+                HTTPStatus.NOT_FOUND.value,
+            )
 
         return make_response(
             jsonify(MsgSchema().load(Msg.ok.value)),
@@ -422,16 +702,43 @@ class DeleteSocialAccountView(CustomSwaggerView):
         )
 
 
-bp.add_url_rule("/<uuid:user_id>", view_func=ChangeUserView.as_view("change_user"), methods=["PUT"])
-bp.add_url_rule("/register", view_func=RegistrationView.as_view("register"), methods=["POST"])
 bp.add_url_rule(
-    "/social/delete/<string:provider>", view_func=DeleteSocialAccountView.as_view("social_delete"), methods=["DELETE"]
+    "/<uuid:user_id>",
+    view_func=ChangeUserView.as_view("change_user"),
+    methods=["PUT", "GET"],
 )
-bp.add_url_rule("/social/login/<string:provider>", view_func=SocialLoginView.as_view("social"), methods=["GET"])
 bp.add_url_rule(
-    "/social/register/<string:provider>", view_func=SocialRegisterView.as_view("social_register"), methods=["GET"]
+    "/register", view_func=RegistrationView.as_view("register"), methods=["POST"]
+)
+bp.add_url_rule(
+    "/social/delete/<string:provider>",
+    view_func=DeleteSocialAccountView.as_view("social_delete"),
+    methods=["DELETE"],
+)
+bp.add_url_rule(
+    "/social/login/<string:provider>",
+    view_func=SocialLoginView.as_view("social"),
+    methods=["GET"],
+)
+bp.add_url_rule(
+    "/social/register/<string:provider>",
+    view_func=SocialRegisterView.as_view("social_register"),
+    methods=["GET"],
 )
 bp.add_url_rule("/login", view_func=LoginView.as_view("login"), methods=["POST"])
-bp.add_url_rule("/refresh/<uuid:user_id>", view_func=RefreshView.as_view("refresh"), methods=["GET"])
-bp.add_url_rule("/logout/<uuid:user_id>", view_func=LogoutView.as_view("logout"), methods=["GET"])
-bp.add_url_rule("/history/<uuid:user_id>", view_func=UserHistoryView.as_view("history"), methods=["GET"])
+bp.add_url_rule(
+    "/refresh/<uuid:user_id>", view_func=RefreshView.as_view("refresh"), methods=["GET"]
+)
+bp.add_url_rule(
+    "/logout/<uuid:user_id>", view_func=LogoutView.as_view("logout"), methods=["GET"]
+)
+bp.add_url_rule(
+    "/history/<uuid:user_id>",
+    view_func=UserHistoryView.as_view("history"),
+    methods=["GET"],
+)
+bp.add_url_rule(
+    "/verificate/<uuid:user_id>",
+    view_func=UserVerificationView.as_view("verification"),
+    methods=["GET"],
+)
